@@ -101,7 +101,7 @@ export function FeesLeader({
                 <CardHeader>
                   <CardTitle>{item.gameNick}</CardTitle>
                   <CardDescription>
-                    {item.amountKk} kk · zgłoszone {formatRelativePl(item.createdAt)}
+                    {item.amountKk} kk · zgłosił: zapłacił {formatRelativePl(item.createdAt)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex gap-2">
@@ -110,7 +110,7 @@ export function FeesLeader({
                     onClick={() => run(() => confirmPayment(item.id))}
                   >
                     {waiting ? <Spinner data-icon="inline-start" /> : null}
-                    Akceptuj
+                    Potwierdź wpłatę
                   </Button>
                   <Button
                     variant="outline"
@@ -181,7 +181,7 @@ export function FeesLeader({
                     <TableCell>{row.overdueWeeks.length}</TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" disabled={waiting} onClick={() => setCollect(row)}>
-                        Wpłać
+                        Zapłacił
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -269,9 +269,9 @@ export function FeesLeader({
         <AlertDialogContent className="max-w-md data-[size=default]:max-w-md data-[size=default]:sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {collect ? `Wpłata od ${collect.gameNick}` : "Wpłata"}
+              {collect ? `Wpłata: ${collect.gameNick}` : "Wpłata"}
             </AlertDialogTitle>
-            <AlertDialogDescription>Nie liczymy aktualnego tygodnia.</AlertDialogDescription>
+            <AlertDialogDescription>Wybierz kwotę wpłaconą przez gracza (zamknięte tygodnie):</AlertDialogDescription>
           </AlertDialogHeader>
           <FeesOfferList
             offers={collectOffers}

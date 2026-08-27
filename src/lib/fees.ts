@@ -53,6 +53,8 @@ export type PaymentOffer = {
   amountKk: number
   title: string
   label: string
+  playerLabel: string
+  leaderLabel: string
   detail: string
 }
 
@@ -61,17 +63,32 @@ export function paymentOffers(state: UserFeeState): PaymentOffer[] {
   const offers: PaymentOffer[] = []
   let running = 0
   const last = state.overdueWeeks.length - 1
+  const isSingle = state.overdueWeeks.length === 1
+
   for (let i = 0; i < state.overdueWeeks.length; i++) {
     const week = state.overdueWeeks[i]
     running += week.remainingKk
     const isAll = i === last && state.overdueWeeks.length > 1
-    const title = isAll ? "Całość" : week.label
+    const title = isSingle ? "Zapłaciłem" : isAll ? "Zapłaciłem całość" : week.label
+    const playerLabel = isSingle
+      ? `Zapłaciłem · ${running} kk`
+      : isAll
+        ? `Zapłaciłem całość · ${running} kk`
+        : `Zapłaciłem: ${week.label} · ${running} kk`
+    const leaderLabel = isSingle
+      ? `Zapłacił · ${running} kk`
+      : isAll
+        ? `Zapłacił całość · ${running} kk`
+        : `Zapłacił: ${week.label} · ${running} kk`
+
     offers.push({
       amountKk: running,
       title,
-      label: `${title} · ${running} kk`,
-      detail: isAll
-        ? `Wszystkie zaległe tygodnie (do ${week.label})`
+      label: playerLabel,
+      playerLabel,
+      leaderLabel,
+      detail: isAll || isSingle
+        ? `Wszystkie zaległe tygodnie (${running} kk)`
         : i === 0
           ? "Najstarszy zaległy tydzień"
           : `Od najstarszego do ${week.label}`,

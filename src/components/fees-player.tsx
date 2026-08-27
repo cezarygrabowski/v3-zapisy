@@ -45,7 +45,7 @@ export function FeesPlayer({
         toast.error(result.error)
         return
       }
-      toast.success(result.message ?? "Zgłoszono wpłatę.")
+      toast.success(result.message ?? "Zgłoszono: zapłacono.")
     })
   }
 
@@ -61,23 +61,26 @@ export function FeesPlayer({
         <CardContent className="flex flex-col gap-3">
           {pending ? (
             <p className="rounded-lg bg-muted px-3 py-2 text-sm">
-              Zgłoszono {pending.amountKk} kk {formatRelativePl(pending.createdAt)}. Czeka na admina.
+              Zgłoszono wpłatę {pending.amountKk} kk {formatRelativePl(pending.createdAt)}. Czeka na potwierdzenie przez admina.
             </p>
           ) : offers.length > 0 ? (
             <div className="flex flex-col gap-2">
               <p className="text-sm text-muted-foreground">Nie liczymy aktualnego tygodnia.</p>
               <div className="flex flex-wrap gap-2">
-                {offers.map((item) => (
-                  <Button
-                    key={item.amountKk}
-                    variant={item.label.startsWith("Całość") ? "default" : "outline"}
-                    disabled={waiting}
-                    onClick={() => setOffer(item)}
-                  >
-                    {waiting ? <Spinner data-icon="inline-start" /> : null}
-                    {item.label}
-                  </Button>
-                ))}
+                {offers.map((item, index) => {
+                  const isPrimary = index === offers.length - 1
+                  return (
+                    <Button
+                      key={item.amountKk}
+                      variant={isPrimary ? "default" : "outline"}
+                      disabled={waiting}
+                      onClick={() => setOffer(item)}
+                    >
+                      {waiting ? <Spinner data-icon="inline-start" /> : null}
+                      {item.playerLabel ?? item.label}
+                    </Button>
+                  )
+                })}
               </div>
             </div>
           ) : null}
@@ -87,8 +90,10 @@ export function FeesPlayer({
       <AlertDialog open={Boolean(offer)} onOpenChange={(open) => !open && setOffer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Zgłosić {offer?.label}?</AlertDialogTitle>
-            <AlertDialogDescription>{offer?.detail}. Admin potwierdzi, jak zbierze yang.</AlertDialogDescription>
+            <AlertDialogTitle>Potwierdzenie wpłaty</AlertDialogTitle>
+            <AlertDialogDescription>
+              Zgłaszasz: {offer?.playerLabel ?? offer?.label} ({offer?.detail}). Admin zweryfikuje i potwierdzi wpłatę w grze.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Anuluj</AlertDialogCancel>
@@ -100,7 +105,7 @@ export function FeesPlayer({
                 report(amountKk)
               }}
             >
-              Zgłoś
+              Zapłaciłem
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
