@@ -112,9 +112,7 @@ export async function getDb(): Promise<AppDb> {
       throw error
     })
   }
-  const db = await globalForDb.dbPromise
-  await ensureSchema(db)
-  return db
+  return globalForDb.dbPromise
 }
 
 export function isUniqueViolation(error: unknown): boolean {
