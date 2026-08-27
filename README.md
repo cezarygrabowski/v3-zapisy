@@ -14,7 +14,7 @@ npm run dev
 
 Wejście deweloperskie na `/login` tworzy konto z nickiem. Zaznacz „Zaloguj jako admin”, żeby testować wpłaty i cudze zapisy.
 
-Bez `DATABASE_URL` baza to PGlite w `./data` (gitignored). Na produkcji musi być Neon.
+Bez `DATABASE_URL` w `.env.local` baza to PGlite w `./data` (gitignored). Neon jest tylko na Vercelu — nie odpalaj `neon env pull` do `.env.local`.
 
 ## Discord
 
