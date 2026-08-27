@@ -28,7 +28,7 @@ export function FeesOfferList({
             )}
           >
             <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="font-medium">{offer.title}</span>
+              <span className="font-medium">{offer.leaderLabel ?? offer.title}</span>
               <span
                 className={cn(
                   "text-xs",

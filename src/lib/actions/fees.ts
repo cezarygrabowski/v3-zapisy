@@ -40,7 +40,7 @@ export async function reportPayment(amountKk: number): Promise<ActionResult> {
     })
   } catch (error) {
     if (isUniqueViolation(error)) {
-      return fail("Masz już zgłoszoną wpłatę. Czekaj na admina.")
+      return fail("Masz już zgłoszoną wpłatę oczekującą na weryfikację.")
     }
     throw error
   }
@@ -68,7 +68,7 @@ export async function confirmPayment(paymentId: string): Promise<ActionResult> {
     .where(and(eq(feePayments.id, paymentId), eq(feePayments.status, "pending")))
 
   revalidateFees()
-  return ok("Wpłata zaakceptowana.")
+  return ok("Wpłata potwierdzona.")
 }
 
 export async function rejectPayment(paymentId: string): Promise<ActionResult> {

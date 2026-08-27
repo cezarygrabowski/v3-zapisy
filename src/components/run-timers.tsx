@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
+import { Volume1, Volume2, VolumeX } from "lucide-react"
 import { syncRunTimer } from "@/lib/actions/run"
 import { formatTimeWarsaw } from "@/lib/dates"
 import type { RunSyncState } from "@/lib/queries"
+import { playTimerSound, type TimerSoundType } from "@/lib/sound"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -24,6 +26,7 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 
 const COCOON_MS = 60 * 60 * 1000
 const NETS_MS = 3 * 60 * 1000
@@ -65,6 +68,10 @@ function LoopTimer({
   sync,
   pingTitle,
   pingBody,
+  soundType,
+  soundEnabled,
+  onToggleSound,
+  volume,
   onSync,
   pending,
 }: {
@@ -74,6 +81,10 @@ function LoopTimer({
   sync: RunSyncState | undefined
   pingTitle: string
   pingBody: string
+  soundType: TimerSoundType
+  soundEnabled: boolean
+  onToggleSound: (checked: boolean) => void
+  volume: number
   onSync: (time: string) => void
   pending: boolean
 }) {
@@ -103,14 +114,28 @@ function LoopTimer({
     if (cycle == null) return
     if (prevCycle.current !== null && cycle !== prevCycle.current) {
       ping(pingTitle, pingBody)
+      if (soundEnabled) {
+        playTimerSound(soundType, volume / 100)
+      }
     }
     prevCycle.current = cycle
-  }, [cycle, pingBody, pingTitle])
+  }, [cycle, pingBody, pingTitle, soundEnabled, soundType, volume])
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle>{title}</CardTitle>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground select-none">
+            <span className="hidden sm:inline">Dźwięk</span>
+            <Switch
+              size="sm"
+              checked={soundEnabled}
+              onCheckedChange={onToggleSound}
+              aria-label={`Dźwięk powiadomienia dla ${title}`}
+            />
+          </label>
+        </div>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -129,6 +154,9 @@ function LoopTimer({
 function QueenTimer({
   lastKill,
   nextQueen,
+  soundEnabled,
+  onToggleSound,
+  volume,
 }: {
   lastKill: { at: string; label: string } | null
   nextQueen: {
@@ -136,6 +164,9 @@ function QueenTimer({
     queens: number
     party: { nick: string; queens: number }[]
   }
+  soundEnabled: boolean
+  onToggleSound: (checked: boolean) => void
+  volume: number
 }) {
   const [now, setNow] = useState(() => Date.now())
   const prevPhase = useRef<string | null>(null)
@@ -165,12 +196,15 @@ function QueenTimer({
   useEffect(() => {
     if (prevPhase.current === "wait" && phase === "window") {
       ping("Królówka", "Może już spaść. Okno: zbicie − 5 min, potem 40 min–2 h.")
+      if (soundEnabled) {
+        playTimerSound("baroness", volume / 100)
+      }
     }
     if (prevPhase.current === "window" && phase === "over") {
       ping("Królówka", "Koniec okna — ktoś pewnie nie wpisał zbicia. Kliknij Zbiłem królówkę.")
     }
     prevPhase.current = phase
-  }, [phase])
+  }, [phase, soundEnabled, volume])
 
   let headline = "—"
   if (phase === "wait" && earlyAt) headline = formatRemain(earlyAt - now)
@@ -186,8 +220,19 @@ function QueenTimer({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Resp królówki</CardTitle>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle>Resp królówki</CardTitle>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground select-none">
+            <span className="hidden sm:inline">Dźwięk</span>
+            <Switch
+              size="sm"
+              checked={soundEnabled}
+              onCheckedChange={onToggleSound}
+              aria-label="Dźwięk powiadomienia dla resp królówki"
+            />
+          </label>
+        </div>
         <CardDescription>
           Okno 40 min–2 h. Kliknięcie „Zbiłem królówkę” resetuje timer.
         </CardDescription>
@@ -287,6 +332,60 @@ export function RunTimers({
   const [pending, startTransition] = useTransition()
   const byKind = new Map(syncs.map((item) => [item.kind, item]))
 
+  const [volume, setVolume] = useState(70)
+  const [soundCocoons, setSoundCocoons] = useState(false)
+  const [soundNets, setSoundNets] = useState(false)
+  const [soundBaroness, setSoundBaroness] = useState(false)
+
+  // Load preferences from localStorage after mount
+  useEffect(() => {
+    try {
+      const savedVol = localStorage.getItem("v3_sound_volume")
+      if (savedVol !== null) {
+        const num = Number(savedVol)
+        if (!isNaN(num)) setVolume(num)
+      }
+      if (localStorage.getItem("v3_sound_cocoons") === "true") setSoundCocoons(true)
+      if (localStorage.getItem("v3_sound_nets") === "true") setSoundNets(true)
+      if (localStorage.getItem("v3_sound_baroness") === "true") setSoundBaroness(true)
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [])
+
+  function handleVolumeChange(val: number) {
+    setVolume(val)
+    try {
+      localStorage.setItem("v3_sound_volume", String(val))
+    } catch {
+      // Ignore
+    }
+  }
+
+  function handleToggleSound(type: TimerSoundType, checked: boolean) {
+    if (type === "cocoons") {
+      setSoundCocoons(checked)
+      try {
+        localStorage.setItem("v3_sound_cocoons", String(checked))
+      } catch {}
+    } else if (type === "nets") {
+      setSoundNets(checked)
+      try {
+        localStorage.setItem("v3_sound_nets", String(checked))
+      } catch {}
+    } else if (type === "baroness") {
+      setSoundBaroness(checked)
+      try {
+        localStorage.setItem("v3_sound_baroness", String(checked))
+      } catch {}
+    }
+
+    if (checked) {
+      askNotify()
+      playTimerSound(type, volume / 100)
+    }
+  }
+
   function sync(kind: string, time: string) {
     startTransition(async () => {
       const result = await syncRunTimer(kind, time)
@@ -300,6 +399,33 @@ export function RunTimers({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Master Volume Slider */}
+      <div className="flex flex-col gap-2 rounded-xl border border-primary/20 bg-card p-3 shadow-xs">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            {volume === 0 ? (
+              <VolumeX className="size-4 text-muted-foreground" />
+            ) : volume < 50 ? (
+              <Volume1 className="size-4 text-primary" />
+            ) : (
+              <Volume2 className="size-4 text-primary" />
+            )}
+            <span>Głośność powiadomień</span>
+          </div>
+          <span className="font-mono text-xs text-muted-foreground tabular-nums">{volume}%</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="5"
+          value={volume}
+          onChange={(e) => handleVolumeChange(Number(e.target.value))}
+          className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary transition-all focus:outline-none"
+          aria-label="Głośność powiadomień"
+        />
+      </div>
+
       <LoopTimer
         title="Następne kokony"
         description="1 h od synchronizacji, potem od nowa i ping."
@@ -307,6 +433,10 @@ export function RunTimers({
         sync={byKind.get("cocoons")}
         pingTitle="Kokony"
         pingBody="Są kokony. Timer poszedł od nowa."
+        soundType="cocoons"
+        soundEnabled={soundCocoons}
+        onToggleSound={(checked) => handleToggleSound("cocoons", checked)}
+        volume={volume}
         pending={pending}
         onSync={(time) => sync("cocoons", time)}
       />
@@ -317,10 +447,20 @@ export function RunTimers({
         sync={byKind.get("nets")}
         pingTitle="Siatki"
         pingBody="Resp siatek. Timer poszedł od nowa."
+        soundType="nets"
+        soundEnabled={soundNets}
+        onToggleSound={(checked) => handleToggleSound("nets", checked)}
+        volume={volume}
         pending={pending}
         onSync={(time) => sync("nets", time)}
       />
-      <QueenTimer lastKill={lastQueenKill} nextQueen={nextQueen} />
+      <QueenTimer
+        lastKill={lastQueenKill}
+        nextQueen={nextQueen}
+        soundEnabled={soundBaroness}
+        onToggleSound={(checked) => handleToggleSound("baroness", checked)}
+        volume={volume}
+      />
     </div>
   )
 }

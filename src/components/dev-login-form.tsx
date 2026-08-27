@@ -8,7 +8,7 @@ export function DevLoginForm() {
     "use server"
     const name = String(formData.get("name") ?? "Dev")
     const leader = formData.get("leader") === "on" ? "true" : "false"
-    await signIn("dev", { name, leader, redirectTo: "/" })
+    await signIn("dev", { name, leader, redirectTo: "/run" })
   }
 
   return (

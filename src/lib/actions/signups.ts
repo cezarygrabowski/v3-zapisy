@@ -18,6 +18,7 @@ import { requireLeader, requireUser } from "@/lib/session"
 
 function revalidateSignupPages() {
   revalidatePath("/", "layout")
+  revalidatePath("/zapisy")
   revalidatePath("/skladki")
   revalidatePath("/statystyki")
   revalidatePath("/run")

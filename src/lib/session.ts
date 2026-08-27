@@ -19,6 +19,6 @@ export async function requireUser(): Promise<User> {
 
 export async function requireLeader(): Promise<User> {
   const user = await requireUser()
-  if (!user.isLeader) redirect("/")
+  if (!user.isLeader) redirect("/run")
   return user
 }
