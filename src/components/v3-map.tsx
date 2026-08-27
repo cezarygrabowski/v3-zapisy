@@ -90,16 +90,13 @@ export function V3Map({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted-foreground">
-        {occupiedCount === 0
-          ? "Nikogo nie ma na slocie. Kokony zostają puste; korony i wejście zawsze widać."
-          : occupiedPositions.has("R1_KORYTARZ")
-            ? occupiedCount === 6
-              ? "Wariant na 6 osób — każdy kolor to jedna pozycja."
-              : `Skład: ${occupiedCount}. Kolorują się zajęte pozycje.`
-            : "R1 korytarz puste — R1, R2 i R3 biorą kokony z wariantu 5-osobowego."}{" "}
-        Numery idą od wejścia — na VC: „królówka 14”, „kokon 3”.
-      </p>
+      {occupiedCount === 0 ? (
+        <p className="text-sm text-muted-foreground">Nikogo nie ma na slocie.</p>
+      ) : occupiedPositions.has("R1_KORYTARZ") ? null : (
+        <p className="text-sm text-muted-foreground">
+          R1 korytarz puste — R1, R2 i R3 biorą większy teren.
+        </p>
+      )}
       <div className="overflow-x-auto rounded-xl bg-white ring-1 ring-foreground/10">
         <svg
           viewBox={`80 20 ${MAP_SIZE.width - 80} ${MAP_SIZE.height - 20}`}
@@ -250,7 +247,7 @@ export function V3Map({
         </p>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Kliknij kokon albo mów numer od wejścia.
+          Kliknij komnatę.
         </p>
       )}
 

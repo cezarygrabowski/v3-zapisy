@@ -48,7 +48,7 @@ export default async function RunPage() {
           <Badge variant="secondary">{STATUS_LABEL[slot.status]}</Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          {slotLabel(slot.id)} · czas zbić idzie z serwera, z sekundami. Strona odświeża się sama co 4 s.
+          {slotLabel(slot.id)}. Strona odświeża się sama.
         </p>
       </div>
 

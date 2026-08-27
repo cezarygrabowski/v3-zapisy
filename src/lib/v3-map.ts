@@ -16,72 +16,72 @@ export const QUEEN = 54
 
 export const MAP_ROOMS: MapRoom[] = [
   // cyan — R3
-  { id: "c1", n: 50, x: 282, y: 78, kind: "cocoon" },
-  { id: "c2", n: 48, x: 437, y: 78, kind: "cocoon" },
-  { id: "c3", n: 42, x: 550, y: 79, kind: "cocoon" },
-  { id: "c4", n: 36, x: 670, y: 81, kind: "cocoon" },
-  { id: "c5", n: 52, x: 162, y: 174, kind: "cocoon" },
-  { id: "c6", n: 51, x: 281, y: 174, kind: "cocoon" },
-  { id: "c7", n: 54, x: 162, y: 268, kind: "cocoon" },
-  { id: "c8", n: 53, x: 282, y: 269, kind: "cocoon" },
+  { id: "c1", n: 32, x: 282, y: 78, kind: "cocoon" },
+  { id: "c2", n: 31, x: 437, y: 78, kind: "cocoon" },
+  { id: "c3", n: 30, x: 550, y: 79, kind: "cocoon" },
+  { id: "c4", n: 29, x: 670, y: 81, kind: "cocoon" },
+  { id: "c5", n: 34, x: 162, y: 174, kind: "cocoon" },
+  { id: "c6", n: 33, x: 281, y: 174, kind: "cocoon" },
+  { id: "c7", n: 36, x: 162, y: 268, kind: "cocoon" },
+  { id: "c8", n: 35, x: 282, y: 269, kind: "cocoon" },
 
   // brown left — R2
-  { id: "bl1", n: 27, x: 670, y: 190, kind: "cocoon" },
-  { id: "bl2", n: 21, x: 670, y: 296, kind: "cocoon" },
-  { id: "bl3", n: 16, x: 670, y: 412, kind: "cocoon" },
-  { id: "bl4", n: 22, x: 670, y: 513, kind: "cocoon" },
-  { id: "bl5", n: 30, x: 667, y: 611, kind: "cocoon" },
-  { id: "bl6", n: 29, x: 542, y: 513, kind: "cocoon" },
-  { id: "bl7", n: 37, x: 542, y: 612, kind: "cocoon" },
-  { id: "bl8", n: 13, x: 842, y: 410, kind: "cocoon" },
-  { id: "q1", n: 28, x: 507, y: 294, kind: "queen" },
-  { id: "q2", n: 17, x: 849, y: 507, kind: "queen" },
-  { id: "q3", n: 43, x: 397, y: 607, kind: "queen" },
+  { id: "bl1", n: 28, x: 670, y: 190, kind: "cocoon" },
+  { id: "bl2", n: 26, x: 670, y: 296, kind: "cocoon" },
+  { id: "bl3", n: 20, x: 670, y: 412, kind: "cocoon" },
+  { id: "bl4", n: 21, x: 670, y: 513, kind: "cocoon" },
+  { id: "bl5", n: 24, x: 667, y: 611, kind: "cocoon" },
+  { id: "bl6", n: 22, x: 542, y: 513, kind: "cocoon" },
+  { id: "bl7", n: 23, x: 542, y: 612, kind: "cocoon" },
+  { id: "bl8", n: 19, x: 842, y: 410, kind: "cocoon" },
+  { id: "q1", n: 27, x: 507, y: 294, kind: "queen" },
+  { id: "q2", n: 10, x: 849, y: 507, kind: "queen" },
+  { id: "q3", n: 25, x: 397, y: 607, kind: "queen" },
 
   // yellow — R1
-  { id: "y1", n: 10, x: 949, y: 410, kind: "cocoon" },
-  { id: "y2", n: 8, x: 1059, y: 411, kind: "cocoon" },
-  { id: "y3", n: 6, x: 1163, y: 411, kind: "cocoon" },
-  { id: "y4", n: 14, x: 950, y: 510, kind: "cocoon" },
-  { id: "y5", n: 11, x: 1059, y: 510, kind: "cocoon" },
+  { id: "y1", n: 8, x: 949, y: 410, kind: "cocoon" },
+  { id: "y2", n: 6, x: 1059, y: 411, kind: "cocoon" },
+  { id: "y3", n: 5, x: 1163, y: 411, kind: "cocoon" },
+  { id: "y4", n: 9, x: 950, y: 510, kind: "cocoon" },
+  { id: "y5", n: 7, x: 1059, y: 510, kind: "cocoon" },
   { id: "y6", n: 4, x: 1163, y: 774, kind: "cocoon" },
   { id: "y7", n: 3, x: 1293, y: 774, kind: "cocoon" },
   { id: "y8", n: 2, x: 1293, y: 856, kind: "cocoon" },
 
   // purple — R1 korytarz
-  { id: "p1", n: 23, x: 835, y: 594, kind: "cocoon" },
-  { id: "p2", n: 18, x: 951, y: 594, kind: "cocoon" },
-  { id: "p3", n: 31, x: 835, y: 677, kind: "cocoon" },
-  { id: "p4", n: 24, x: 951, y: 677, kind: "cocoon" },
-  { id: "p5", n: 32, x: 951, y: 838, kind: "cocoon" },
-  { id: "p6", n: 38, x: 1035, y: 839, kind: "cocoon" },
-  { id: "p7", n: 45, x: 1110, y: 839, kind: "cocoon" },
+  { id: "p1", n: 12, x: 835, y: 594, kind: "cocoon" },
+  { id: "p2", n: 11, x: 951, y: 594, kind: "cocoon" },
+  { id: "p3", n: 13, x: 835, y: 677, kind: "cocoon" },
+  { id: "p4", n: 14, x: 951, y: 677, kind: "cocoon" },
+  { id: "p5", n: 15, x: 951, y: 838, kind: "cocoon" },
+  { id: "p6", n: 16, x: 1035, y: 839, kind: "cocoon" },
+  { id: "p7", n: 18, x: 1110, y: 839, kind: "cocoon" },
 
   // pink — Prawo korytarz
-  { id: "k1", n: 25, x: 1671, y: 509, kind: "cocoon" },
-  { id: "k2", n: 19, x: 1672, y: 605, kind: "cocoon" },
-  { id: "k3", n: 7, x: 1427, y: 694, kind: "cocoon" },
-  { id: "k4", n: 9, x: 1518, y: 696, kind: "cocoon" },
-  { id: "k5", n: 12, x: 1591, y: 696, kind: "cocoon" },
-  { id: "k6", n: 15, x: 1672, y: 694, kind: "cocoon" },
-  { id: "k7", n: 5, x: 1427, y: 774, kind: "cocoon" },
+  { id: "k1", n: 45, x: 1671, y: 509, kind: "cocoon" },
+  { id: "k2", n: 43, x: 1672, y: 605, kind: "cocoon" },
+  { id: "k3", n: 38, x: 1427, y: 694, kind: "cocoon" },
+  { id: "k4", n: 39, x: 1518, y: 696, kind: "cocoon" },
+  { id: "k5", n: 40, x: 1591, y: 696, kind: "cocoon" },
+  { id: "k6", n: 41, x: 1672, y: 694, kind: "cocoon" },
+  { id: "k7", n: 37, x: 1427, y: 774, kind: "cocoon" },
 
   // brown right — Prawo
   { id: "r1", n: 49, x: 1336, y: 323, kind: "queen" },
-  { id: "br1", n: 47, x: 1452, y: 322, kind: "cocoon" },
-  { id: "br2", n: 41, x: 1559, y: 322, kind: "cocoon" },
-  { id: "br3", n: 39, x: 1668, y: 322, kind: "cocoon" },
-  { id: "br4", n: 46, x: 1784, y: 326, kind: "cocoon" },
-  { id: "br5", n: 33, x: 1671, y: 418, kind: "cocoon" },
-  { id: "br6", n: 40, x: 1784, y: 418, kind: "cocoon" },
-  { id: "br7", n: 34, x: 1559, y: 508, kind: "cocoon" },
-  { id: "br8", n: 35, x: 1784, y: 509, kind: "cocoon" },
+  { id: "br1", n: 48, x: 1452, y: 322, kind: "cocoon" },
+  { id: "br2", n: 47, x: 1559, y: 322, kind: "cocoon" },
+  { id: "br3", n: 50, x: 1668, y: 322, kind: "cocoon" },
+  { id: "br4", n: 51, x: 1784, y: 326, kind: "cocoon" },
+  { id: "br5", n: 52, x: 1671, y: 418, kind: "cocoon" },
+  { id: "br6", n: 53, x: 1784, y: 418, kind: "cocoon" },
+  { id: "br7", n: 46, x: 1559, y: 508, kind: "cocoon" },
+  { id: "br8", n: 54, x: 1784, y: 509, kind: "cocoon" },
 
   // shared / landmarks
-  { id: "w1", n: 44, x: 1038, y: 756, kind: "queen" },
+  { id: "w1", n: 17, x: 1038, y: 756, kind: "queen" },
   { id: "w2", n: 1, x: 1294, y: 948, kind: "entrance" },
-  { id: "w3", n: 26, x: 1785, y: 606, kind: "queen" },
-  { id: "w4", n: 20, x: 1673, y: 783, kind: "queen" },
+  { id: "w3", n: 44, x: 1785, y: 606, kind: "queen" },
+  { id: "w4", n: 42, x: 1673, y: 783, kind: "queen" },
 ]
 
 export const MAP_EDGES: [string, string][] = [
@@ -206,40 +206,36 @@ export const MAP_ZONE_LAYOUTS: Partial<Record<number, Record<string, PositionId>
   6: ZONE_6,
 }
 
-const WHEN_R1_KORYTARZ_EMPTY: Record<PositionId, number[]> = {
-  R1: [10, 8, 14, 11, 18, 23, 31, 24, 32, 38, 45],
-  R2: [29, 22, 37, 30, 13, 6, 4, 3, 2, 16],
-  R3: [54, 52, 51, 53, 50, 48, 42, 36, 27, 21],
+const WHEN_R1_KORYTARZ_EMPTY: Record<PositionId, string[]> = {
+  R1: ["y1", "y2", "y4", "y5", "p2", "p1", "p3", "p4", "p5", "p6", "p7"],
+  R2: ["bl6", "bl4", "bl7", "bl5", "bl8", "y3", "y6", "y7", "y8", "bl3"],
+  R3: ["c7", "c5", "c6", "c8", "c1", "c2", "c3", "c4", "bl1", "bl2"],
   R1_KORYTARZ: [],
   PRAWO: [],
   PRAWO_KORYTARZ: [],
 }
 
-function roomIdByNumber(n: number): string | undefined {
-  return MAP_ROOMS.find((room) => room.n === n)?.id
-}
-
 const ZONE_LABEL_ANCHORS: Partial<
-  Record<PositionId, { rooms: number[] } | { beside: number; dx: number; dy: number }>
+  Record<PositionId, { rooms: string[] } | { beside: string; dx: number; dy: number }>
 > = {
-  R3: { rooms: [52, 51, 54, 53] },
-  R2: { rooms: [29, 22, 37, 30] },
-  R1: { rooms: [10, 8, 14, 11] },
-  R1_KORYTARZ: { beside: 44, dx: 78, dy: 0 },
-  PRAWO_KORYTARZ: { beside: 20, dx: -78, dy: 0 },
-  PRAWO: { rooms: [39, 46, 33, 40] },
+  R3: { rooms: ["c5", "c6", "c7", "c8"] },
+  R2: { rooms: ["bl6", "bl4", "bl7", "bl5"] },
+  R1: { rooms: ["y1", "y2", "y4", "y5"] },
+  R1_KORYTARZ: { beside: "w1", dx: 78, dy: 0 },
+  PRAWO_KORYTARZ: { beside: "w4", dx: -78, dy: 0 },
+  PRAWO: { rooms: ["br3", "br4", "br5", "br6"] },
 }
 
 export function zoneLabelAnchor(position: PositionId): { x: number; y: number } | null {
   const spec = ZONE_LABEL_ANCHORS[position]
   if (!spec) return null
   if ("beside" in spec) {
-    const room = MAP_ROOMS.find((item) => item.n === spec.beside)
+    const room = MAP_ROOMS.find((item) => item.id === spec.beside)
     if (!room) return null
     return { x: room.x + spec.dx, y: room.y + spec.dy }
   }
   const rooms = spec.rooms
-    .map((n) => MAP_ROOMS.find((item) => item.n === n))
+    .map((id) => MAP_ROOMS.find((item) => item.id === id))
     .filter((room): room is MapRoom => Boolean(room))
   if (rooms.length === 0) return null
   return {
@@ -257,13 +253,12 @@ export function layoutForOccupied(occupiedPositions: Set<PositionId>): Record<st
   for (const [id, position] of Object.entries(ZONE_6)) {
     if (position !== "R1_KORYTARZ") layout[id] = position
   }
-  for (const [position, numbers] of Object.entries(WHEN_R1_KORYTARZ_EMPTY) as [
+  for (const [position, ids] of Object.entries(WHEN_R1_KORYTARZ_EMPTY) as [
     PositionId,
-    number[],
+    string[],
   ][]) {
-    for (const n of numbers) {
-      const id = roomIdByNumber(n)
-      if (id) layout[id] = position
+    for (const id of ids) {
+      layout[id] = position
     }
   }
   return layout
