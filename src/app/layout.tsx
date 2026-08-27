@@ -1,17 +1,18 @@
 import type { Metadata } from "next"
 import type { ReactNode } from "react"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Cinzel, Source_Sans_3 } from "next/font/google"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sourceSans = Source_Sans_3({
+  variable: "--font-source-sans",
   subsets: ["latin", "latin-ext"],
 })
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const cinzel = Cinzel({
+  variable: "--font-cinzel",
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "600", "700"],
 })
 
 export const metadata: Metadata = {
@@ -23,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="pl"
-      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`dark ${sourceSans.variable} ${cinzel.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
         {children}

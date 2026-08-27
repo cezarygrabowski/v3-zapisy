@@ -11,7 +11,7 @@ export function PasswordLoginForm() {
     const login = String(formData.get("login") ?? "")
     const password = String(formData.get("password") ?? "")
     try {
-      await signIn("password", { login, password, redirectTo: "/" })
+      await signIn("password", { login, password, redirectTo: "/run" })
     } catch (error) {
       if (error instanceof AuthError) {
         redirect("/login?error=CredentialsSignin")
