@@ -1,3 +1,5 @@
+import { AuthError } from "next-auth"
+import { redirect } from "next/navigation"
 import { signIn } from "@/auth"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -8,12 +10,19 @@ export function PasswordLoginForm() {
     "use server"
     const login = String(formData.get("login") ?? "")
     const password = String(formData.get("password") ?? "")
-    await signIn("password", { login, password, redirectTo: "/" })
+    try {
+      await signIn("password", { login, password, redirectTo: "/" })
+    } catch (error) {
+      if (error instanceof AuthError) {
+        redirect("/login?error=CredentialsSignin")
+      }
+      throw error
+    }
   }
 
   return (
-    <form action={login} className="flex flex-col gap-4">
-      <FieldGroup>
+    <form action={login} className="flex flex-col items-start gap-4">
+      <FieldGroup className="w-full">
         <Field>
           <FieldLabel htmlFor="login">Login</FieldLabel>
           <Input
@@ -37,9 +46,7 @@ export function PasswordLoginForm() {
           />
         </Field>
       </FieldGroup>
-      <Button type="submit" className="w-full">
-        Zaloguj loginem
-      </Button>
+      <Button type="submit">Zaloguj</Button>
     </form>
   )
 }

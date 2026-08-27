@@ -62,7 +62,9 @@ export default async function LoginPage({
         <CardContent className="flex flex-col gap-4">
           {message ? (
             <Alert variant="destructive">
-              <AlertTitle>Brak dostępu</AlertTitle>
+              <AlertTitle>
+                {error === "CredentialsSignin" ? "Logowanie" : "Brak dostępu"}
+              </AlertTitle>
               <AlertDescription>{message}</AlertDescription>
             </Alert>
           ) : null}
