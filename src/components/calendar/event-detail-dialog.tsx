@@ -215,21 +215,14 @@ export function EventDetailDialog({
     })
   }
 
-  function handleDelete() {
-    if (!event) return
-    const isRecurring = Boolean(event.recurrence && event.recurrence !== "none")
-    let deleteSeries = false
-    if (isRecurring) {
-      const choice = confirm(
-        "To wydarzenie jest częścią serii.\n\nKliknij OK, aby usunąć WSZYSTKIE powtarzające się wydarzenia z tej serii.\nKliknij Anuluj, aby usunąć TYLKO to jedno wydarzenie."
-      )
-      deleteSeries = choice
-    } else {
-      if (!confirm("Czy na pewno chcesz usunąć to wydarzenie?")) return
-    }
+  // Custom delete confirmation dialog state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
+  function confirmDelete(deleteAllInSeries: boolean) {
+    if (!event) return
+    setDeleteConfirmOpen(false)
     startTransition(async () => {
-      const res = await deleteGuildEvent(event.id, { deleteAllInSeries: deleteSeries })
+      const res = await deleteGuildEvent(event.id, { deleteAllInSeries })
       if (!res.ok) {
         toast.error(res.error)
         return
@@ -238,6 +231,11 @@ export function EventDetailDialog({
       onOpenChange(false)
       onEventUpdated?.()
     })
+  }
+
+  function handleDelete() {
+    if (!event) return
+    setDeleteConfirmOpen(true)
   }
 
   function handleSaveProperties(e?: React.FormEvent) {
@@ -943,6 +941,48 @@ export function EventDetailDialog({
               {pending ? <Spinner data-icon="inline-start" /> : null}
               Wpisz gracza
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Usuń wydarzenie</DialogTitle>
+            <DialogDescription>
+              {event?.recurrence && event.recurrence !== "none"
+                ? `Wydarzenie "${event?.title}" jest częścią serii powtarzającej się. Co chcesz usunąć?`
+                : `Czy na pewno chcesz usunąć wydarzenie "${event?.title}"? Tej operacji nie można cofnąć.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={pending}
+            >
+              Anuluj
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => confirmDelete(false)}
+              disabled={pending}
+            >
+              {pending ? <Spinner data-icon="inline-start" /> : null}
+              Usuń to wydarzenie
+            </Button>
+            {event?.recurrence && event.recurrence !== "none" && (
+              <Button
+                variant="destructive"
+                className="bg-red-700 hover:bg-red-800"
+                onClick={() => confirmDelete(true)}
+                disabled={pending}
+              >
+                {pending ? <Spinner data-icon="inline-start" /> : null}
+                Usuń wszystkie
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
