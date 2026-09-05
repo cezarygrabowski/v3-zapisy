@@ -19,6 +19,7 @@ import {
   getEventColorPreset,
   type EventColorId,
   type EventDetails,
+  type GuildEventType,
 } from "@/lib/calendar-types"
 import { formatDatePl } from "@/lib/dates"
 import { Badge } from "@/components/ui/badge"
@@ -32,7 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldLabel } from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 
@@ -64,10 +65,15 @@ export function EventDetailDialog({
   // Party signup role
   const [partyRole, setPartyRole] = useState("")
 
-  // Edit properties state (title, color, description, series)
+  // Edit properties state (identical to create form)
   const [isEditing, setIsEditing] = useState(false)
+  const [editType, setEditType] = useState<GuildEventType>("v3")
   const [editTitle, setEditTitle] = useState("")
   const [editColor, setEditColor] = useState<EventColorId>("blue")
+  const [editDate, setEditDate] = useState("")
+  const [editStartTime, setEditStartTime] = useState("")
+  const [editEndTime, setEditEndTime] = useState("")
+  const [editMaxParticipants, setEditMaxParticipants] = useState<number | "">("")
   const [editDescription, setEditDescription] = useState("")
   const [updateSeries, setUpdateSeries] = useState(true)
 
@@ -86,8 +92,13 @@ export function EventDetailDialog({
           setEvent(data)
           setLoadedEventId(eventId)
           if (data) {
+            setEditType(data.type as GuildEventType)
             setEditTitle(data.title)
             setEditColor((data.color as EventColorId) || "blue")
+            setEditDate(data.date)
+            setEditStartTime(data.startTime)
+            setEditEndTime(data.endTime || "")
+            setEditMaxParticipants(data.maxParticipants || "")
             setEditDescription(data.description || "")
             setIsEditing(false)
             setUpdateSeries(Boolean(data.recurrence && data.recurrence !== "none"))
@@ -205,9 +216,20 @@ export function EventDetailDialog({
   }
 
   function handleDelete() {
-    if (!event || !confirm("Czy na pewno chcesz usunąć to wydarzenie?")) return
+    if (!event) return
+    const isRecurring = Boolean(event.recurrence && event.recurrence !== "none")
+    let deleteSeries = false
+    if (isRecurring) {
+      const choice = confirm(
+        "To wydarzenie jest częścią serii.\n\nKliknij OK, aby usunąć WSZYSTKIE powtarzające się wydarzenia z tej serii.\nKliknij Anuluj, aby usunąć TYLKO to jedno wydarzenie."
+      )
+      deleteSeries = choice
+    } else {
+      if (!confirm("Czy na pewno chcesz usunąć to wydarzenie?")) return
+    }
+
     startTransition(async () => {
-      const res = await deleteGuildEvent(event.id)
+      const res = await deleteGuildEvent(event.id, { deleteAllInSeries: deleteSeries })
       if (!res.ok) {
         toast.error(res.error)
         return
@@ -224,8 +246,13 @@ export function EventDetailDialog({
     startTransition(async () => {
       const res = await updateGuildEventProperties({
         eventId: event.id,
+        type: editType,
         title: editTitle,
         color: editColor,
+        date: editDate,
+        startTime: editStartTime,
+        endTime: editEndTime,
+        maxParticipants: editMaxParticipants ? Number(editMaxParticipants) : null,
         description: editDescription,
         updateAllInSeries: updateSeries,
       })
@@ -294,69 +321,146 @@ export function EventDetailDialog({
                     </div>
 
                     {isEditing ? (
-                      <form onSubmit={handleSaveProperties} className="flex flex-col gap-3 my-2 max-w-xl">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-muted-foreground">Nazwa wydarzenia:</label>
-                          <Input
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            className="h-8 text-sm font-semibold"
-                            required
-                          />
-                        </div>
+                      <form onSubmit={handleSaveProperties} className="flex flex-col gap-4 my-2 max-w-xl bg-card border p-4 rounded-xl shadow-xs">
+                        <FieldGroup>
+                          <Field>
+                            <FieldLabel htmlFor="edit-event-type">Kategoria</FieldLabel>
+                            <select
+                              id="edit-event-type"
+                              value={editType}
+                              onChange={(e) => {
+                                const newType = e.target.value as GuildEventType
+                                setEditType(newType)
+                                setEditColor(EVENT_TYPE_METADATA[newType].defaultColor)
+                              }}
+                              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            >
+                              {Object.entries(EVENT_TYPE_METADATA).map(([k, v]) => (
+                                <option key={k} value={k}>
+                                  {v.icon} {v.label}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
 
-                        {/* Color Picker Swatches */}
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-muted-foreground">Kolor wydarzenia:</label>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {(Object.keys(EVENT_COLORS) as EventColorId[]).map((cId) => {
-                              const p = EVENT_COLORS[cId]
-                              const isSelected = editColor === cId
-                              return (
-                                <button
-                                  key={cId}
-                                  type="button"
-                                  onClick={() => setEditColor(cId)}
-                                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                                    isSelected
-                                      ? "ring-2 ring-primary border-primary font-bold shadow-xs scale-105"
-                                      : "border-border/70 hover:border-border"
-                                  }`}
-                                >
-                                  <span className={`h-2.5 w-2.5 rounded-full ${p.dotClass}`} />
-                                  <span>{p.label}</span>
-                                </button>
-                              )
-                            })}
+                          <Field>
+                            <FieldLabel>Kolor</FieldLabel>
+                            <div className="flex items-center gap-2.5 pt-0.5">
+                              {Object.entries(EVENT_COLORS).map(([cKey, cVal]) => {
+                                const isSelected = editColor === cKey
+                                return (
+                                  <button
+                                    key={cKey}
+                                    type="button"
+                                    onClick={() => setEditColor(cKey as EventColorId)}
+                                    title={cVal.label}
+                                    className={`h-7 w-7 rounded-full transition-transform flex items-center justify-center relative shadow-xs ${cVal.dotClass} ${
+                                      isSelected
+                                        ? "ring-2 ring-foreground ring-offset-2 ring-offset-background scale-110"
+                                        : "hover:scale-105 opacity-90 hover:opacity-100"
+                                    }`}
+                                  >
+                                    {isSelected ? (
+                                      <span className="h-2 w-2 rounded-full bg-white shadow-xs" />
+                                    ) : null}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </Field>
+
+                          <Field>
+                            <FieldLabel htmlFor="edit-event-title">Nazwa</FieldLabel>
+                            <Input
+                              id="edit-event-title"
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                              placeholder="np. Wieczorne V3 lub Wyprawa na Smoka"
+                              required
+                            />
+                          </Field>
+
+                          {!updateSeries ? (
+                            <Field>
+                              <FieldLabel htmlFor="edit-event-date">Data</FieldLabel>
+                              <Input
+                                id="edit-event-date"
+                                type="date"
+                                value={editDate}
+                                onChange={(e) => setEditDate(e.target.value)}
+                                required
+                              />
+                            </Field>
+                          ) : null}
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <Field>
+                              <FieldLabel htmlFor="edit-event-start">Start</FieldLabel>
+                              <Input
+                                id="edit-event-start"
+                                type="time"
+                                value={editStartTime}
+                                onChange={(e) => setEditStartTime(e.target.value)}
+                                required
+                              />
+                            </Field>
+
+                            <Field>
+                              <FieldLabel htmlFor="edit-event-end">Koniec</FieldLabel>
+                              <Input
+                                id="edit-event-end"
+                                type="time"
+                                value={editEndTime}
+                                onChange={(e) => setEditEndTime(e.target.value)}
+                                required
+                              />
+                            </Field>
                           </div>
-                        </div>
 
-                        {/* Description field */}
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-muted-foreground">Opis (opcjonalny):</label>
-                          <Input
-                            value={editDescription}
-                            onChange={(e) => setEditDescription(e.target.value)}
-                            placeholder="Notatki lub opis akcji"
-                            className="h-8 text-xs"
-                          />
-                        </div>
+                          {EVENT_TYPE_METADATA[editType].mode === "party" ? (
+                            <Field>
+                              <FieldLabel htmlFor="edit-event-max">Limit miejsc</FieldLabel>
+                              <Input
+                                id="edit-event-max"
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={editMaxParticipants}
+                                onChange={(e) =>
+                                  setEditMaxParticipants(e.target.value === "" ? "" : Number(e.target.value))
+                                }
+                                placeholder="np. 8 dla pełnego party"
+                              />
+                            </Field>
+                          ) : null}
 
-                        {/* Series toggle checkbox if recurring or multiple instances */}
-                        <div className="flex items-center gap-2 pt-1">
-                          <Checkbox
-                            id="update-series"
-                            checked={updateSeries}
-                            onCheckedChange={(checked) => setUpdateSeries(Boolean(checked))}
-                          />
-                          <label htmlFor="update-series" className="text-xs font-medium cursor-pointer">
-                            Zastosuj do wszystkich powtarzających się wydarzeń z tej serii ({event.title})
-                          </label>
-                        </div>
+                          <Field>
+                            <FieldLabel htmlFor="edit-event-desc">Opis</FieldLabel>
+                            <Input
+                              id="edit-event-desc"
+                              value={editDescription}
+                              onChange={(e) => setEditDescription(e.target.value)}
+                              placeholder="np. Wymagane przepustki i buff smok"
+                            />
+                          </Field>
 
-                        <div className="flex items-center gap-2 pt-1">
+                          {/* Series toggle checkbox */}
+                          <div className="flex items-center gap-2 pt-1 border-t">
+                            <Checkbox
+                              id="update-series"
+                              checked={updateSeries}
+                              onCheckedChange={(checked) => setUpdateSeries(Boolean(checked))}
+                            />
+                            <label htmlFor="update-series" className="text-xs font-medium cursor-pointer">
+                              Zastosuj do wszystkich powtarzających się wydarzeń z tej serii ({event.title})
+                            </label>
+                          </div>
+                        </FieldGroup>
+
+                        <div className="flex items-center gap-2 pt-2">
                           <Button size="xs" type="submit" disabled={pending}>
-                            {pending ? "Zapisywanie..." : "Zapisz zmiany"}
+                            {pending ? <Spinner data-icon="inline-start" /> : null}
+                            Zapisz zmiany
                           </Button>
                           <Button
                             size="xs"
@@ -364,8 +468,13 @@ export function EventDetailDialog({
                             variant="outline"
                             onClick={() => {
                               setIsEditing(false)
+                              setEditType(event.type as GuildEventType)
                               setEditTitle(event.title)
                               setEditColor((event.color as EventColorId) || "blue")
+                              setEditDate(event.date)
+                              setEditStartTime(event.startTime)
+                              setEditEndTime(event.endTime || "")
+                              setEditMaxParticipants(event.maxParticipants || "")
                               setEditDescription(event.description || "")
                             }}
                             disabled={pending}

@@ -317,12 +317,21 @@ export async function updateGuildEventStatus(
   return ok("Zaktualizowano status wydarzenia.")
 }
 
-export async function deleteGuildEvent(eventId: string): Promise<ActionResult> {
+export async function deleteGuildEvent(
+  eventId: string,
+  options?: { deleteAllInSeries?: boolean }
+): Promise<ActionResult> {
   const user = await requireUser()
   const db = await getDb()
 
   const [event] = await db
-    .select({ id: guildEvents.id, createdBy: guildEvents.createdBy })
+    .select({
+      id: guildEvents.id,
+      title: guildEvents.title,
+      type: guildEvents.type,
+      startTime: guildEvents.startTime,
+      createdBy: guildEvents.createdBy,
+    })
     .from(guildEvents)
     .where(eq(guildEvents.id, eventId))
 
@@ -331,11 +340,29 @@ export async function deleteGuildEvent(eventId: string): Promise<ActionResult> {
     return fail("Brak uprawnień do usunięcia tego wydarzenia.")
   }
 
-  await db.delete(guildEvents).where(eq(guildEvents.id, eventId))
+  if (options?.deleteAllInSeries) {
+    await db
+      .delete(guildEvents)
+      .where(
+        and(
+          eq(guildEvents.title, event.title),
+          eq(guildEvents.type, event.type),
+          eq(guildEvents.startTime, event.startTime),
+          eq(guildEvents.createdBy, event.createdBy)
+        )
+      )
+  } else {
+    await db.delete(guildEvents).where(eq(guildEvents.id, eventId))
+  }
 
   revalidatePath("/kalendarz")
   revalidatePath("/")
-  return ok("Usunięto wydarzenie.")
+  revalidatePath("/panel")
+  return ok(
+    options?.deleteAllInSeries
+      ? "Usunięto wszystkie wydarzenia z tej serii."
+      : "Usunięto wydarzenie."
+  )
 }
 
 export async function rescheduleGuildEvent(input: {
@@ -390,7 +417,12 @@ export async function rescheduleGuildEvent(input: {
 export async function updateGuildEventProperties(input: {
   eventId: string
   title?: string
+  type?: string
   color?: string
+  date?: string
+  startTime?: string
+  endTime?: string
+  maxParticipants?: number | null
   description?: string
   updateAllInSeries?: boolean
 }): Promise<ActionResult> {
@@ -416,13 +448,33 @@ export async function updateGuildEventProperties(input: {
 
   const updates: {
     title?: string
+    type?: string
     color?: string
+    date?: string
+    startTime?: string
+    endTime?: string
+    durationHours?: number
+    maxParticipants?: number | null
     description?: string | null
   } = {}
 
   if (input.title && input.title.trim()) updates.title = input.title.trim()
+  if (input.type) updates.type = input.type
   if (input.color) updates.color = input.color
+  if (input.startTime) updates.startTime = input.startTime
+  if (input.endTime) updates.endTime = input.endTime
+  if (input.maxParticipants !== undefined) updates.maxParticipants = input.maxParticipants
   if (input.description !== undefined) updates.description = input.description.trim() || null
+
+  if (input.startTime && input.endTime) {
+    updates.durationHours = calculateDurationHours(input.startTime, input.endTime)
+  }
+
+  // Single event date can only be changed when not updating all series dates
+  if (!input.updateAllInSeries && input.date) {
+    if (!isIsoDate(input.date)) return fail("Nieprawidłowa data.")
+    updates.date = input.date
+  }
 
   if (Object.keys(updates).length === 0) {
     return ok("Brak zmian do zapisania.")
