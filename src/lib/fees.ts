@@ -11,8 +11,8 @@ export type FeeCharge = {
   gameNick: string
   playstyle: Playstyle | null
   date: string
-  slot: SlotId
-  position: PositionId
+  slot: SlotId | string
+  position: PositionId | string
   feeKk: number
 }
 
@@ -23,8 +23,8 @@ export type ConfirmedCredit = {
 
 export type WeekEntry = {
   date: string
-  slot: SlotId
-  position: PositionId
+  slot: SlotId | string
+  position: PositionId | string
   feeKk: number
 }
 

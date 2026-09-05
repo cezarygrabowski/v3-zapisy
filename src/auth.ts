@@ -36,7 +36,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
   )
 
   return {
+    secret: process.env.AUTH_SECRET,
     trustHost: true,
+    logger: {
+      error(error) {
+        if (error.name === "JWTSessionError" || (error as { code?: string }).code === "JWTSessionError") {
+          return
+        }
+        console.error(error)
+      },
+    },
     pages: {
       signIn: "/login",
       error: "/login",

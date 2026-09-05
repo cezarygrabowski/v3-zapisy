@@ -1,6 +1,8 @@
-import { and, desc, eq, gte, inArray } from "drizzle-orm"
+import { and, desc, eq, gte, inArray, ne } from "drizzle-orm"
 import {
   POSITIONS,
+  PVM_FEE_KK,
+  PVP_FEE_KK,
   SLOTS,
   type Playstyle,
   type PositionId,
@@ -9,6 +11,8 @@ import {
 import { getDb } from "@/lib/db"
 import {
   feePayments,
+  guildEvents,
+  guildEventSignups,
   runKillHelpers,
   runKills,
   runSyncs,
@@ -99,27 +103,53 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
   const db = await getDb()
   const chargeRows = await db
     .select({
+      signupId: guildEventSignups.id,
       userId: users.id,
       gameNick: users.gameNick,
       playstyle: users.playstyle,
-      date: signups.date,
-      slot: signups.slot,
-      position: signups.position,
-      feeKk: signups.feeKk,
+      eventDate: guildEvents.date,
+      eventTitle: guildEvents.title,
+      eventStartTime: guildEvents.startTime,
+      eventEndTime: guildEvents.endTime,
+      eventType: guildEvents.type,
+      spot: guildEventSignups.spot,
+      role: guildEventSignups.role,
+      hourIndex: guildEventSignups.hourIndex,
     })
-    .from(signups)
-    .innerJoin(users, eq(signups.userId, users.id))
-    .where(eq(signups.paid, false))
+    .from(guildEventSignups)
+    .innerJoin(guildEvents, eq(guildEventSignups.eventId, guildEvents.id))
+    .innerJoin(users, eq(guildEventSignups.userId, users.id))
+    .where(
+      and(
+        eq(guildEventSignups.attended, true),
+        ne(guildEvents.status, "cancelled")
+      )
+    )
 
-  const charges: FeeCharge[] = chargeRows.map((row) => ({
-    userId: row.userId,
-    gameNick: row.gameNick,
-    playstyle: (row.playstyle as Playstyle | null) ?? null,
-    date: row.date,
-    slot: row.slot as SlotId,
-    position: row.position as PositionId,
-    feeKk: row.feeKk,
-  }))
+  const charges: FeeCharge[] = chargeRows.map((row) => {
+    const playstyle = (
+      row.role?.toLowerCase() === "pvp"
+        ? "pvp"
+        : row.role?.toLowerCase() === "pvm"
+          ? "pvm"
+          : row.playstyle
+    ) as Playstyle | null
+
+    const feeKk = playstyle === "pvp" ? PVP_FEE_KK : PVM_FEE_KK
+    const timeLabel = row.eventEndTime
+      ? `${row.eventStartTime}–${row.eventEndTime}`
+      : row.eventStartTime
+
+    return {
+      userId: row.userId,
+      gameNick: row.gameNick,
+      playstyle,
+      date: row.eventDate,
+      slot: `${timeLabel} · ${row.eventTitle}`,
+      position: (row.spot as PositionId) || row.role || "Uczestnik",
+      feeKk,
+    }
+  })
 
   const credits = await db
     .select({
@@ -237,11 +267,20 @@ export async function listStats(fromDate: string | null): Promise<StatsRow[]> {
       userId: users.id,
       gameNick: users.gameNick,
       playstyle: users.playstyle,
-      position: signups.position,
+      spot: guildEventSignups.spot,
+      role: guildEventSignups.role,
+      date: guildEvents.date,
     })
-    .from(signups)
-    .innerJoin(users, eq(signups.userId, users.id))
-    .where(fromDate ? gte(signups.date, fromDate) : undefined)
+    .from(guildEventSignups)
+    .innerJoin(guildEvents, eq(guildEventSignups.eventId, guildEvents.id))
+    .innerJoin(users, eq(guildEventSignups.userId, users.id))
+    .where(
+      and(
+        eq(guildEventSignups.attended, true),
+        ne(guildEvents.status, "cancelled"),
+        fromDate ? gte(guildEvents.date, fromDate) : undefined
+      )
+    )
 
   const map = new Map<string, StatsRow>()
   for (const row of rows) {
@@ -265,8 +304,8 @@ export async function listStats(fromDate: string | null): Promise<StatsRow[]> {
       map.set(row.userId, stats)
     }
     stats.entries += 1
-    const position = row.position as PositionId
-    if (position in stats.byPosition) {
+    const position = row.spot as PositionId
+    if (position && position in stats.byPosition) {
       stats.byPosition[position] += 1
     }
   }

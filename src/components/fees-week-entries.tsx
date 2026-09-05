@@ -11,8 +11,8 @@ export function entryWord(count: number): string {
 export function WeekEntries({ entries }: { entries: WeekEntry[] }) {
   return (
     <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
-      {entries.map((entry) => (
-        <li key={`${entry.date}-${entry.slot}-${entry.position}`}>
+      {entries.map((entry, idx) => (
+        <li key={`${entry.date}-${entry.slot}-${entry.position}-${idx}`}>
           {formatDatePl(entry.date)} · {slotLabel(entry.slot as SlotId)} ·{" "}
           {positionLabel(entry.position as PositionId)} · {entry.feeKk} kk
         </li>

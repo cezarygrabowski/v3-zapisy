@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <AppNav nick={user.gameNick} isLeader={user.isLeader} pendingPayments={pendingPayments} />
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6">
+      <main className="mx-auto flex w-full max-w-[1720px] flex-1 flex-col gap-6 px-4 py-6">
         {children}
       </main>
     </>

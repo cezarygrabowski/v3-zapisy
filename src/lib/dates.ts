@@ -2,7 +2,7 @@ import { type SlotId } from "@/lib/constants"
 
 const TIME_ZONE = "Europe/Warsaw"
 
-function pad(value: number): string {
+export function pad(value: number): string {
   return String(value).padStart(2, "0")
 }
 

@@ -28,6 +28,8 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 
+import { playMapSound } from "@/lib/panel-audio"
+
 const COCOON_MS = 60 * 60 * 1000
 const NETS_MS = 3 * 60 * 1000
 const QUEEN_FIGHT_MS = 5 * 60 * 1000
@@ -55,6 +57,7 @@ function askNotify() {
 }
 
 function ping(title: string, body: string) {
+  playMapSound("v3")
   toast.message(title, { description: body })
   if (typeof Notification !== "undefined" && Notification.permission === "granted") {
     new Notification(title, { body })

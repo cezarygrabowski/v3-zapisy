@@ -8,11 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 
 const LINKS = [
-  { href: "/run", label: "Run" },
-  { href: "/zapisy", label: "Zapisy" },
+  { href: "/panel", label: "⚔️ Panel" },
+  { href: "/kalendarz", label: "📅 Kalendarz" },
   { href: "/skladki", label: "Składki" },
   { href: "/statystyki", label: "Statystyki" },
-  { href: "/regulamin", label: "Regulamin" },
   { href: "/konto", label: "Konto" },
 ]
 
@@ -31,17 +30,17 @@ export function AppNav({
     : LINKS
 
   return (
-    <header className="border-b border-primary/20 bg-card">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <header className="border-b bg-card">
+      <div className="mx-auto flex w-full max-w-[1720px] flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/run" className="font-heading text-base font-semibold tracking-wide text-primary">
+          <Link href="/panel" className="font-heading text-base font-semibold">
             V3 zapisy
           </Link>
           {isLeader ? <Badge variant="secondary">Admin</Badge> : null}
         </div>
         <nav className="flex flex-wrap items-center gap-1">
           {links.map((link) => {
-            const active = pathname === link.href || pathname.startsWith(`${link.href}/`)
+            const active = pathname.startsWith(link.href)
             return (
               <Link
                 key={link.href}

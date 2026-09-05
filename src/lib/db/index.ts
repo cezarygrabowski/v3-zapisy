@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises"
+import { mkdir, rm } from "node:fs/promises"
 import path from "node:path"
 import { sql } from "drizzle-orm"
 import * as schema from "@/lib/db/schema"
@@ -71,6 +71,125 @@ const SCHEMA_SQL = [
     )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS fee_payments_one_pending
       ON fee_payments (user_id) WHERE status = 'pending'`,
+  `CREATE TABLE IF NOT EXISTS red_expeditions (
+      id text PRIMARY KEY,
+      title text NOT NULL,
+      spot text NOT NULL DEFAULT 'boss',
+      date text NOT NULL,
+      start_time text NOT NULL,
+      duration_hours integer NOT NULL DEFAULT 3,
+      respawn_minutes integer NOT NULL DEFAULT 50,
+      respawn_min_minutes integer NOT NULL DEFAULT 48,
+      respawn_max_minutes integer NOT NULL DEFAULT 52,
+      status text NOT NULL DEFAULT 'planned',
+      notes text,
+      created_by text NOT NULL REFERENCES users(id),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `ALTER TABLE red_expeditions ADD COLUMN IF NOT EXISTS spot text NOT NULL DEFAULT 'boss'`,
+  `ALTER TABLE red_expeditions ADD COLUMN IF NOT EXISTS respawn_min_minutes integer NOT NULL DEFAULT 48`,
+  `ALTER TABLE red_expeditions ADD COLUMN IF NOT EXISTS respawn_max_minutes integer NOT NULL DEFAULT 52`,
+  `CREATE TABLE IF NOT EXISTS red_expedition_signups (
+      id text PRIMARY KEY,
+      expedition_id text NOT NULL REFERENCES red_expeditions(id) ON DELETE CASCADE,
+      user_id text NOT NULL REFERENCES users(id),
+      hour_index integer NOT NULL,
+      attended boolean NOT NULL DEFAULT false,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT red_expedition_signups_unique UNIQUE (expedition_id, user_id, hour_index)
+    )`,
+  `CREATE TABLE IF NOT EXISTS red_boss_kills (
+      id text PRIMARY KEY,
+      expedition_id text REFERENCES red_expeditions(id) ON DELETE SET NULL,
+      channel integer NOT NULL,
+      reported_by text NOT NULL REFERENCES users(id),
+      killed_at timestamptz NOT NULL DEFAULT now(),
+      killed_at_label text NOT NULL,
+      date text NOT NULL
+    )`,
+  `CREATE TABLE IF NOT EXISTS red_shop_items (
+      id text PRIMARY KEY,
+      week_start text NOT NULL,
+      expedition_id text REFERENCES red_expeditions(id) ON DELETE SET NULL,
+      name text NOT NULL,
+      quantity integer NOT NULL DEFAULT 1,
+      price_won integer NOT NULL DEFAULT 0,
+      price_kk integer NOT NULL DEFAULT 0,
+      status text NOT NULL DEFAULT 'listed',
+      sold_price_won integer,
+      sold_price_kk integer,
+      added_by text NOT NULL REFERENCES users(id),
+      notes text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      sold_at timestamptz
+    )`,
+  `CREATE TABLE IF NOT EXISTS red_payouts (
+      id text PRIMARY KEY,
+      week_start text NOT NULL,
+      user_id text NOT NULL REFERENCES users(id),
+      is_paid boolean NOT NULL DEFAULT false,
+      paid_at timestamptz,
+      paid_by text REFERENCES users(id),
+      CONSTRAINT red_payouts_week_user_unique UNIQUE (week_start, user_id)
+    )`,
+  `CREATE TABLE IF NOT EXISTS timer_categories (
+      id text PRIMARY KEY,
+      name text NOT NULL,
+      icon text NOT NULL DEFAULT '🗺️',
+      order_index integer NOT NULL DEFAULT 0,
+      created_by text NOT NULL REFERENCES users(id),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `CREATE TABLE IF NOT EXISTS custom_timers (
+      id text PRIMARY KEY,
+      category_id text NOT NULL REFERENCES timer_categories(id) ON DELETE CASCADE,
+      name text NOT NULL,
+      channels_count integer NOT NULL DEFAULT 5,
+      respawn_min_minutes integer NOT NULL DEFAULT 48,
+      respawn_max_minutes integer NOT NULL DEFAULT 52,
+      notes text,
+      created_by text NOT NULL REFERENCES users(id),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `CREATE TABLE IF NOT EXISTS custom_timer_kills (
+      id text PRIMARY KEY,
+      timer_id text NOT NULL REFERENCES custom_timers(id) ON DELETE CASCADE,
+      channel integer NOT NULL,
+      killed_at timestamptz NOT NULL DEFAULT now(),
+      killed_at_label text NOT NULL,
+      reported_by text NOT NULL REFERENCES users(id),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `CREATE TABLE IF NOT EXISTS guild_events (
+      id text PRIMARY KEY,
+      title text NOT NULL,
+      type text NOT NULL DEFAULT 'v3',
+      date text NOT NULL,
+      start_time text NOT NULL,
+      end_time text,
+      duration_hours integer NOT NULL DEFAULT 3,
+      signup_mode text NOT NULL DEFAULT 'spots',
+      recurrence text NOT NULL DEFAULT 'none',
+      max_participants integer,
+      description text,
+      status text NOT NULL DEFAULT 'planned',
+      created_by text NOT NULL REFERENCES users(id),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `ALTER TABLE guild_events ADD COLUMN IF NOT EXISTS end_time text`,
+  `ALTER TABLE guild_events ADD COLUMN IF NOT EXISTS recurrence text NOT NULL DEFAULT 'none'`,
+  `ALTER TABLE guild_events ADD COLUMN IF NOT EXISTS color text NOT NULL DEFAULT 'blue'`,
+  `CREATE TABLE IF NOT EXISTS guild_event_signups (
+      id text PRIMARY KEY,
+      event_id text NOT NULL REFERENCES guild_events(id) ON DELETE CASCADE,
+      user_id text NOT NULL REFERENCES users(id),
+      hour_index integer NOT NULL DEFAULT 0,
+      spot text,
+      role text,
+      attended boolean NOT NULL DEFAULT false,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `ALTER TABLE guild_event_signups ADD COLUMN IF NOT EXISTS spot text`,
 ]
 
 async function ensureSchema(db: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }) {
@@ -98,6 +217,10 @@ async function createDb(): Promise<AppDb> {
   const { drizzle } = await import("drizzle-orm/pglite")
   const dataDir = path.join(process.cwd(), "data")
   await mkdir(dataDir, { recursive: true })
+  const pidFile = path.join(dataDir, "v3", "postmaster.pid")
+  try {
+    await rm(pidFile, { force: true })
+  } catch {}
   const client = new PGlite(path.join(dataDir, "v3"))
   await client.waitReady
   const db = drizzle({ client, schema }) as unknown as AppDb

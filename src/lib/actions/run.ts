@@ -16,6 +16,7 @@ import { requireUser } from "@/lib/session"
 
 function revalidateRun() {
   revalidatePath("/run")
+  revalidatePath("/panel")
   revalidatePath("/statystyki")
 }
 
@@ -138,5 +139,6 @@ export async function syncRunTimer(kind: string, timeHms: string): Promise<Actio
   await upsertSync(db, kind, syncedAt, label, user.id)
 
   revalidatePath("/run")
+  revalidatePath("/panel")
   return ok(`Sync ${label}`)
 }
