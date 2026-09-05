@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lte } from "drizzle-orm"
+import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm"
 import {
   calculateDurationHours,
   computeEventEffectiveStatus,
@@ -50,8 +50,8 @@ export async function listGuildEvents(options?: {
     .from(guildEvents)
     .innerJoin(users, eq(guildEvents.createdBy, users.id))
     .where(whereClause)
-    .orderBy(desc(guildEvents.date), desc(guildEvents.startTime))
-    .limit(options?.limit ?? 100)
+    .orderBy(asc(guildEvents.date), asc(guildEvents.startTime))
+    .limit(options?.limit ?? 500)
 
   if (rows.length === 0) return []
 

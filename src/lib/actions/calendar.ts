@@ -387,9 +387,81 @@ export async function rescheduleGuildEvent(input: {
   return ok("Zaktualizowano termin wydarzenia.")
 }
 
+export async function updateGuildEventProperties(input: {
+  eventId: string
+  title?: string
+  color?: string
+  description?: string
+  updateAllInSeries?: boolean
+}): Promise<ActionResult> {
+  const user = await requireUser()
+  const db = await getDb()
+
+  const [targetEvent] = await db
+    .select({
+      id: guildEvents.id,
+      title: guildEvents.title,
+      type: guildEvents.type,
+      startTime: guildEvents.startTime,
+      createdBy: guildEvents.createdBy,
+      recurrence: guildEvents.recurrence,
+    })
+    .from(guildEvents)
+    .where(eq(guildEvents.id, input.eventId))
+
+  if (!targetEvent) return fail("Nie znaleziono wydarzenia.")
+  if (!user.isLeader && targetEvent.createdBy !== user.id) {
+    return fail("Tylko Admin lub twórca wydarzenia może edytować jego właściwości.")
+  }
+
+  const updates: {
+    title?: string
+    color?: string
+    description?: string | null
+  } = {}
+
+  if (input.title && input.title.trim()) updates.title = input.title.trim()
+  if (input.color) updates.color = input.color
+  if (input.description !== undefined) updates.description = input.description.trim() || null
+
+  if (Object.keys(updates).length === 0) {
+    return ok("Brak zmian do zapisania.")
+  }
+
+  if (input.updateAllInSeries) {
+    // Update all matching events created by this creator with the same title, type, and start time
+    await db
+      .update(guildEvents)
+      .set(updates)
+      .where(
+        and(
+          eq(guildEvents.title, targetEvent.title),
+          eq(guildEvents.type, targetEvent.type),
+          eq(guildEvents.startTime, targetEvent.startTime),
+          eq(guildEvents.createdBy, targetEvent.createdBy)
+        )
+      )
+  } else {
+    await db
+      .update(guildEvents)
+      .set(updates)
+      .where(eq(guildEvents.id, input.eventId))
+  }
+
+  revalidatePath("/kalendarz")
+  revalidatePath(`/kalendarz/wydarzenie/${input.eventId}`)
+  revalidatePath("/panel")
+  return ok(
+    input.updateAllInSeries
+      ? "Zaktualizowano wszystkie wydarzenia z tej serii."
+      : "Zaktualizowano wydarzenie."
+  )
+}
+
 export async function getGuildEventModalDetails(eventId: string) {
   const { getGuildEventDetails } = await import("@/lib/calendar-queries")
   const event = await getGuildEventDetails(eventId)
   return event
 }
+
 

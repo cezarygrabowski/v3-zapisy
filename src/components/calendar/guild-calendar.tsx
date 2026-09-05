@@ -74,9 +74,18 @@ export function GuildCalendar({
   const weekDays = [0, 1, 2, 3, 4, 5, 6].map((offset) => {
     const dateStr = addDays(currentWeekStart, offset)
     const dayNamesPl = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"]
+    const [year, month, day] = dateStr.split("-").map(Number)
+    const dateObj = new Date(Date.UTC(year, month - 1, day))
+    const dayDateFormatted = new Intl.DateTimeFormat("pl-PL", {
+      day: "numeric",
+      month: "short",
+      timeZone: "UTC",
+    }).format(dateObj)
+
     return {
       date: dateStr,
       dayName: dayNamesPl[offset],
+      dayDate: dayDateFormatted,
       dayEvents: eventsByDate.get(dateStr) ?? [],
       isToday: dateStr === today,
     }
@@ -537,17 +546,19 @@ export function GuildCalendar({
                       day.isToday ? "bg-primary/10" : ""
                     }`}
                   >
-                    <span className={`text-xs font-bold block ${day.isToday ? "text-primary" : "text-foreground"}`}>
-                      {day.dayName}
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span className={`text-xs font-bold ${day.isToday ? "text-primary" : "text-foreground"}`}>
+                        {day.dayName}
+                      </span>
+                      {day.isToday ? (
+                        <Badge className="bg-primary text-[9px] h-4 px-1.5 font-bold leading-none inline-flex items-center">
+                          Dziś
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground block mt-0.5">
+                      {day.dayDate}
                     </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {formatDatePl(day.date).split(",")[0]}
-                    </span>
-                    {day.isToday ? (
-                      <Badge className="bg-primary text-[9px] h-4 px-1 font-bold mt-0.5 inline-flex">
-                        Dziś
-                      </Badge>
-                    ) : null}
                   </div>
                 ))}
               </div>

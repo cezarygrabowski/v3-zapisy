@@ -8,14 +8,17 @@ import {
   deleteGuildEvent,
   signUpForGuildEvent,
   toggleGuildEventAttendance,
+  updateGuildEventProperties,
   updateGuildEventStatus,
   withdrawFromGuildEvent,
 } from "@/lib/actions/calendar"
 import {
+  EVENT_COLORS,
   EVENT_TYPE_METADATA,
   RED_LAS_EVENT_SPOTS,
   V3_EVENT_SPOTS,
   getEventColorPreset,
+  type EventColorId,
   type EventDetails,
 } from "@/lib/calendar-types"
 import { formatDatePl } from "@/lib/dates"
@@ -53,8 +56,35 @@ export function EventDetailView({
   // User selection for leader assignment
   const [selectedUserId, setSelectedUserId] = useState(allGuildUsers[0]?.id ?? "")
 
-  // Role for party signup
+  // Party signup role
   const [partyRole, setPartyRole] = useState("")
+
+  // Edit properties state (title, color, description, series)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(event.title)
+  const [editColor, setEditColor] = useState<EventColorId>((event.color as EventColorId) || "blue")
+  const [editDescription, setEditDescription] = useState(event.description || "")
+  const [updateSeries, setUpdateSeries] = useState(Boolean(event.recurrence && event.recurrence !== "none"))
+
+  function handleSaveProperties(e?: React.FormEvent) {
+    if (e) e.preventDefault()
+    startTransition(async () => {
+      const res = await updateGuildEventProperties({
+        eventId: event.id,
+        title: editTitle,
+        color: editColor,
+        description: editDescription,
+        updateAllInSeries: updateSeries,
+      })
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+      setIsEditing(false)
+      router.refresh()
+    })
+  }
 
   function handlePartySignUp(e: React.FormEvent) {
     e.preventDefault()
@@ -204,26 +234,124 @@ export function EventDetailView({
             ) : null}
           </div>
 
-          <h1 className="font-heading text-2xl font-bold">{event.title}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Data: <span className="font-medium text-foreground">{formatDatePl(event.date)}</span> | Czas:{" "}
-            <span className="font-mono font-medium text-foreground">{event.startTime}</span>
-            {event.endTime ? (
-              <>
-                {" "}– <span className="font-mono font-medium text-foreground">{event.endTime}</span>
-              </>
-            ) : null}{" "}
-            ({event.durationHours}h)
-            {event.maxParticipants ? ` | Limit: ${event.maxParticipants} osób` : ""}
-          </p>
-          {event.description ? (
-            <p className="text-xs text-muted-foreground italic mt-1.5">„{event.description}”</p>
-          ) : null}
+          {isEditing ? (
+            <form onSubmit={handleSaveProperties} className="flex flex-col gap-3 my-3 max-w-xl">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Nazwa wydarzenia:</label>
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="h-8 text-sm font-semibold"
+                  required
+                />
+              </div>
+
+              {/* Color Picker Swatches */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Kolor wydarzenia:</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(Object.keys(EVENT_COLORS) as EventColorId[]).map((cId) => {
+                    const p = EVENT_COLORS[cId]
+                    const isSelected = editColor === cId
+                    return (
+                      <button
+                        key={cId}
+                        type="button"
+                        onClick={() => setEditColor(cId)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                          isSelected
+                            ? "ring-2 ring-primary border-primary font-bold shadow-xs scale-105"
+                            : "border-border/70 hover:border-border"
+                        }`}
+                      >
+                        <span className={`h-2.5 w-2.5 rounded-full ${p.dotClass}`} />
+                        <span>{p.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Description field */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Opis (opcjonalny):</label>
+                <Input
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Notatki lub opis akcji"
+                  className="h-8 text-xs"
+                />
+              </div>
+
+              {/* Series toggle checkbox */}
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox
+                  id="page-update-series"
+                  checked={updateSeries}
+                  onCheckedChange={(checked) => setUpdateSeries(Boolean(checked))}
+                />
+                <label htmlFor="page-update-series" className="text-xs font-medium cursor-pointer">
+                  Zastosuj do wszystkich powtarzających się wydarzeń z tej serii ({event.title})
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <Button size="xs" type="submit" disabled={pending}>
+                  {pending ? "Zapisywanie..." : "Zapisz zmiany"}
+                </Button>
+                <Button
+                  size="xs"
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditing(false)
+                    setEditTitle(event.title)
+                    setEditColor((event.color as EventColorId) || "blue")
+                    setEditDescription(event.description || "")
+                  }}
+                  disabled={pending}
+                >
+                  Anuluj
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <h1 className="font-heading text-2xl font-bold">{event.title}</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Data: <span className="font-medium text-foreground">{formatDatePl(event.date)}</span> | Czas:{" "}
+                <span className="font-mono font-medium text-foreground">{event.startTime}</span>
+                {event.endTime ? (
+                  <>
+                    {" "}– <span className="font-mono font-medium text-foreground">{event.endTime}</span>
+                  </>
+                ) : null}{" "}
+                ({event.durationHours}h)
+                {event.maxParticipants ? ` | Limit: ${event.maxParticipants} osób` : ""}
+              </p>
+              {event.description ? (
+                <p className="text-xs text-muted-foreground italic mt-1.5">„{event.description}”</p>
+              ) : null}
+            </>
+          )}
         </div>
 
         {/* Status controls */}
         {canManage ? (
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+            {!isEditing ? (
+              <Button
+                size="xs"
+                variant="outline"
+                className="gap-1 text-xs"
+                onClick={() => setIsEditing(true)}
+                disabled={pending}
+              >
+                <span>✏️</span>
+                <span>Edytuj</span>
+              </Button>
+            ) : null}
+
             {event.status !== "active" ? (
               <Button size="xs" variant="outline" onClick={() => handleStatusChange("active")} disabled={pending}>
                 Oznacz jako trwające
