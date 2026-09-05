@@ -1,6 +1,10 @@
-# V3 zapisy
+# ElderHub – Centrum Operacyjne Gildii (ElderMT2)
 
-Siatka zapisów gildii na V3 zamiast Excela. Logowanie Discordem (tylko członkowie serwera) albo loginem i hasłem od admina, jeden zapis na osobę dziennie, składki PVP 3 kk / PVM 7 kk, statystyki pozycji.
+Centrum dowodzenia i system operacyjny gildii:
+- **Panel Operacyjny (`/panel`):** Radar bossów terenowych (5 kanałów) w czasie rzeczywistym, HUD Lochu Pająków V3, widok custom oraz konfigurowalne dźwięki per mapa (Web Audio API).
+- **Kalendarz Gildijny (`/kalendarz`):** Zapisy na wyprawy blokowe (V3, Red Las) oraz raid party na bossy/dungeony z odznaczaniem obecności.
+- **Składki i Rozliczenia (`/skladki`):** Automatyczny skarbiec i rozliczanie składek PvP (3 kk) / PvM (7 kk) powiązany z obecnością na wydarzeniach.
+- **Statystyki (`/statystyki`):** Zestawienie aktywności członków gildii na wyprawach.
 
 ## Lokalnie
 

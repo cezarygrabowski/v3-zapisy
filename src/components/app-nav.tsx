@@ -34,7 +34,7 @@ export function AppNav({
       <div className="mx-auto flex w-full max-w-[1720px] flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Link href="/panel" className="font-heading text-base font-semibold">
-            V3 zapisy
+            ElderHub
           </Link>
           {isLeader ? <Badge variant="secondary">Admin</Badge> : null}
         </div>

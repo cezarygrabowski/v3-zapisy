@@ -263,14 +263,14 @@ export function PanelHub({
       document.title = `${tabText} Panel`
     } else {
       if (activeTab === "v3") {
-        document.title = "🕷️ [V3] Panel"
+        document.title = "🕷️ [V3] ElderHub"
       } else {
-        document.title = "Panel | V3 Zapisy"
+        document.title = "ElderHub | Panel"
       }
     }
 
     return () => {
-      document.title = "Panel | V3 Zapisy"
+      document.title = "ElderHub | Panel"
     }
   }, [activeTab, categories, syncs, v3Kills, now])
 

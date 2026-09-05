@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "V3 zapisy",
-  description: "Zapisy gildii na V3 — sloty, pozycje i składki.",
+  title: "ElderHub – Centrum Operacyjne Gildii",
+  description: "Centrum dowodzenia gildii: panel operacyjny, timery bossów, kalendarz wypraw i rozliczanie składek",
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -53,11 +53,9 @@ export default async function LoginPage({
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>V3 zapisy</CardTitle>
-          <CardDescription>
-            Discord gildii albo login i hasło od admina. Random z linkiem nic tu nie zobaczy.
-          </CardDescription>
+        <CardHeader className="text-center">
+          <CardTitle>ElderHub</CardTitle>
+          <CardDescription>Centrum operacyjne gildii</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {message ? (
