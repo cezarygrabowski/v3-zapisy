@@ -36,7 +36,7 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>
 }) {
   const user = await getCurrentUser()
-  if (user) redirect("/run")
+  if (user) redirect("/panel")
 
   const params = await searchParams
   const error = typeof params.error === "string" ? params.error : undefined
@@ -47,7 +47,7 @@ export default async function LoginPage({
 
   async function loginDiscord() {
     "use server"
-    await signIn("discord", { redirectTo: "/run" })
+    await signIn("discord", { redirectTo: "/panel" })
   }
 
   return (
