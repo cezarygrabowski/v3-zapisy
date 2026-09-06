@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useTransition } from "react"
+import { Check, Link2 } from "lucide-react"
 import { toast } from "sonner"
 import {
   deleteGuildEvent,
@@ -217,6 +218,22 @@ export function EventDetailDialog({
 
   // Custom delete confirmation dialog state
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
+
+  function handleCopyLink() {
+    if (!event) return
+    const url = `${window.location.origin}/kalendarz/wydarzenie/${event.id}`
+    navigator.clipboard.writeText(url).then(
+      () => {
+        setCopiedLink(true)
+        toast.success("Skopiowano link do wydarzenia do schowka!")
+        setTimeout(() => setCopiedLink(false), 2000)
+      },
+      () => {
+        toast.error("Nie udało się skopiować linku.")
+      }
+    )
+  }
 
   function confirmDelete(deleteAllInSeries: boolean) {
     if (!event) return
@@ -502,51 +519,73 @@ export function EventDetailDialog({
                     )}
                   </div>
 
-                  {canManage ? (
-                    <div className="flex items-center gap-1.5 shrink-0 self-start">
-                      {!isEditing ? (
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          className="gap-1 text-xs"
-                          onClick={() => setIsEditing(true)}
-                          disabled={pending}
-                        >
-                          <span>✏️</span>
-                          <span>Edytuj</span>
-                        </Button>
-                      ) : null}
-
-                      {event.status !== "active" ? (
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          onClick={() => handleStatusChange("active")}
-                          disabled={pending}
-                        >
-                          Wystartuj
-                        </Button>
+                  <div className="flex items-center gap-1.5 shrink-0 self-start flex-wrap justify-end">
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={handleCopyLink}
+                      type="button"
+                    >
+                      {copiedLink ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-500" />
+                          <span>Skopiowano</span>
+                        </>
                       ) : (
+                        <>
+                          <Link2 className="h-3.5 w-3.5" />
+                          <span>Kopiuj link</span>
+                        </>
+                      )}
+                    </Button>
+
+                    {canManage ? (
+                      <>
+                        {!isEditing ? (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="gap-1 text-xs"
+                            onClick={() => setIsEditing(true)}
+                            disabled={pending}
+                          >
+                            <span>✏️</span>
+                            <span>Edytuj</span>
+                          </Button>
+                        ) : null}
+
+                        {event.status !== "active" ? (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={() => handleStatusChange("active")}
+                            disabled={pending}
+                          >
+                            Wystartuj
+                          </Button>
+                        ) : (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={() => handleStatusChange("finished")}
+                            disabled={pending}
+                          >
+                            Zakończ
+                          </Button>
+                        )}
                         <Button
                           size="xs"
-                          variant="outline"
-                          onClick={() => handleStatusChange("finished")}
+                          variant="ghost"
+                          className="text-xs text-muted-foreground hover:text-destructive"
+                          onClick={handleDelete}
                           disabled={pending}
                         >
-                          Zakończ
+                          Usuń
                         </Button>
-                      )}
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        className="text-xs text-muted-foreground hover:text-destructive"
-                        onClick={handleDelete}
-                        disabled={pending}
-                      >
-                        Usuń
-                      </Button>
-                    </div>
-                  ) : null}
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
