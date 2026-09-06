@@ -18,7 +18,9 @@ import {
   todayInWarsaw,
   weekStartInWarsaw,
   weekStartForDate,
+  isIsoDate,
 } from "@/lib/dates"
+import { Check, Link2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +34,7 @@ export function GuildCalendar({
   isAdmin = false,
   allGuildUsers = [],
   initialEventId,
+  initialWeekStart,
 }: {
   events: GuildEventListItem[]
   currentUserId?: string
@@ -39,6 +42,7 @@ export function GuildCalendar({
   isAdmin?: boolean
   allGuildUsers?: { id: string; gameNick: string }[]
   initialEventId?: string
+  initialWeekStart?: string
 }) {
   const userIsAdmin = Boolean(isAdmin || isLeader)
   const router = useRouter()
@@ -46,6 +50,7 @@ export function GuildCalendar({
   const [selectedType, setSelectedType] = useState<string>("all")
   const [showOnlyMine, setShowOnlyMine] = useState(false)
   const [viewMode, setViewMode] = useState<"week" | "month" | "agenda">("week")
+  const [copiedWeekLink, setCopiedWeekLink] = useState(false)
 
   const handleSelectEvent = useCallback((id: string | null) => {
     setSelectedEventId(id)
@@ -64,6 +69,9 @@ export function GuildCalendar({
 
   // Week navigation state
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+    if (initialWeekStart && isIsoDate(initialWeekStart)) {
+      return weekStartForDate(initialWeekStart)
+    }
     if (initialEventId) {
       const match = events.find((e) => e.id === initialEventId)
       if (match) {
@@ -72,6 +80,37 @@ export function GuildCalendar({
     }
     return weekStartInWarsaw()
   })
+
+  const updateWeek = useCallback((newWeekStart: string) => {
+    setCurrentWeekStart(newWeekStart)
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href)
+      const thisWeekStart = weekStartInWarsaw()
+      if (newWeekStart === thisWeekStart) {
+        url.searchParams.delete("tydzien")
+      } else {
+        url.searchParams.set("tydzien", newWeekStart)
+      }
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`)
+    }
+  }, [])
+
+  const handleCopyWeekLink = useCallback(() => {
+    if (typeof window === "undefined") return
+    const url = new URL(window.location.href)
+    url.searchParams.set("tydzien", currentWeekStart)
+    url.searchParams.delete("wydarzenie")
+    navigator.clipboard.writeText(url.toString()).then(
+      () => {
+        setCopiedWeekLink(true)
+        toast.success("Skopiowano link do tego tygodnia!")
+        setTimeout(() => setCopiedWeekLink(false), 2000)
+      },
+      () => {
+        toast.error("Nie udało się skopiować linku.")
+      }
+    )
+  }, [currentWeekStart])
 
   // Month navigation state
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear())
@@ -370,15 +409,15 @@ export function GuildCalendar({
   }
 
   function handlePrevWeek() {
-    setCurrentWeekStart(addDays(currentWeekStart, -7))
+    updateWeek(addDays(currentWeekStart, -7))
   }
 
   function handleNextWeek() {
-    setCurrentWeekStart(addDays(currentWeekStart, 7))
+    updateWeek(addDays(currentWeekStart, 7))
   }
 
   function handleTodayWeek() {
-    setCurrentWeekStart(weekStartInWarsaw())
+    updateWeek(weekStartInWarsaw())
   }
 
   // Month calculation
@@ -529,11 +568,30 @@ export function GuildCalendar({
         <div className="flex flex-col gap-3">
           {/* Week navigation bar */}
           <div className="flex items-center justify-between bg-card border rounded-xl p-3 shadow-xs">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <span className="font-heading font-bold text-base">
                 Tydzień: {formatWeekRangePl(currentWeekStart)}
               </span>
-              <span className="hidden sm:inline text-xs text-muted-foreground">
+              <Button
+                size="xs"
+                variant="outline"
+                className="h-7 text-xs px-2 gap-1.5 text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
+                onClick={handleCopyWeekLink}
+                title="Kopiuj link do tego tygodnia"
+              >
+                {copiedWeekLink ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Skopiowano</span>
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline text-[11px]">Kopiuj link do tygodnia</span>
+                  </>
+                )}
+              </Button>
+              <span className="hidden lg:inline text-xs text-muted-foreground">
                 (Kliknij i przeciągnij w siatce, aby dodać wydarzenie)
               </span>
             </div>
