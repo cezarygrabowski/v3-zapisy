@@ -6,8 +6,13 @@ import { requireUser } from "@/lib/session"
 
 export const dynamic = "force-dynamic"
 
-export default async function CalendarPage() {
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ wydarzenie?: string }>
+}) {
   const user = await requireUser()
+  const { wydarzenie } = await searchParams
   const today = todayInWarsaw()
   const startDate = addDays(today, -60) // 2 months back for history
   const endDate = addDays(today, 120)  // 4 months forward for planning
@@ -28,6 +33,7 @@ export default async function CalendarPage() {
       currentUserId={user.id}
       isLeader={user.isLeader}
       allGuildUsers={users.map((u) => ({ id: u.id, gameNick: u.gameNick }))}
+      initialEventId={wydarzenie}
     />
   )
 }

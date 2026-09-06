@@ -222,7 +222,7 @@ export function EventDetailDialog({
 
   function handleCopyLink() {
     if (!event) return
-    const url = `${window.location.origin}/kalendarz/wydarzenie/${event.id}`
+    const url = `${window.location.origin}/kalendarz?wydarzenie=${event.id}`
     navigator.clipboard.writeText(url).then(
       () => {
         setCopiedLink(true)
@@ -555,16 +555,7 @@ export function EventDetailDialog({
                           </Button>
                         ) : null}
 
-                        {event.status !== "active" ? (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            onClick={() => handleStatusChange("active")}
-                            disabled={pending}
-                          >
-                            Wystartuj
-                          </Button>
-                        ) : (
+                        {event.status === "active" ? (
                           <Button
                             size="xs"
                             variant="outline"
@@ -573,7 +564,7 @@ export function EventDetailDialog({
                           >
                             Zakończ
                           </Button>
-                        )}
+                        ) : null}
                         <Button
                           size="xs"
                           variant="ghost"
@@ -656,9 +647,6 @@ export function EventDetailDialog({
                                     </Badge>
                                   )}
                                 </div>
-                                <span className="text-[11px] text-muted-foreground truncate block">
-                                  {spot.desc}
-                                </span>
                               </div>
                             </div>
 
@@ -789,9 +777,6 @@ export function EventDetailDialog({
                               </div>
                               <span className="font-heading font-bold text-sm block truncate">
                                 {spot.name}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground block truncate">
-                                {spot.desc}
                               </span>
                             </div>
 

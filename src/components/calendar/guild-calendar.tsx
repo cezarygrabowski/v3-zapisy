@@ -17,6 +17,7 @@ import {
   formatWeekRangePl,
   todayInWarsaw,
   weekStartInWarsaw,
+  weekStartForDate,
 } from "@/lib/dates"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -30,24 +31,47 @@ export function GuildCalendar({
   isLeader = false,
   isAdmin = false,
   allGuildUsers = [],
+  initialEventId,
 }: {
   events: GuildEventListItem[]
   currentUserId?: string
   isLeader?: boolean
   isAdmin?: boolean
   allGuildUsers?: { id: string; gameNick: string }[]
+  initialEventId?: string
 }) {
   const userIsAdmin = Boolean(isAdmin || isLeader)
   const router = useRouter()
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(initialEventId ?? null)
   const [selectedType, setSelectedType] = useState<string>("all")
   const [showOnlyMine, setShowOnlyMine] = useState(false)
   const [viewMode, setViewMode] = useState<"week" | "month" | "agenda">("week")
 
+  const handleSelectEvent = useCallback((id: string | null) => {
+    setSelectedEventId(id)
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href)
+      if (id) {
+        url.searchParams.set("wydarzenie", id)
+      } else {
+        url.searchParams.delete("wydarzenie")
+      }
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`)
+    }
+  }, [])
+
   const today = todayInWarsaw()
 
   // Week navigation state
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => weekStartInWarsaw())
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+    if (initialEventId) {
+      const match = events.find((e) => e.id === initialEventId)
+      if (match) {
+        return weekStartForDate(match.date)
+      }
+    }
+    return weekStartInWarsaw()
+  })
 
   // Month navigation state
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear())
@@ -262,7 +286,7 @@ export function GuildCalendar({
             finishEventDrag(cur)
           } else {
             // Normal click without movement: open modal!
-            setSelectedEventId(cur.event.id)
+            handleSelectEvent(cur.event.id)
           }
         }
         return null
@@ -724,10 +748,10 @@ export function GuildCalendar({
                                 })
                               }}
                               onClick={() => {
-                                if (!eventDrag?.hasMoved) {
-                                  setSelectedEventId(evt.id)
-                                }
-                              }}
+                                 if (!eventDrag?.hasMoved) {
+                                   handleSelectEvent(evt.id)
+                                 }
+                               }}
                               className={`absolute text-left rounded-[6px] pl-2.5 pr-2 py-1.5 flex flex-col justify-between text-xs transition-all z-10 shadow-xs border overflow-hidden group select-none ${
                                 isBeingDragged ? "opacity-35 scale-[0.98] pointer-events-none" : ""
                               } ${
@@ -910,7 +934,7 @@ export function GuildCalendar({
                           <button
                             key={evt.id}
                             type="button"
-                            onClick={() => setSelectedEventId(evt.id)}
+                            onClick={() => handleSelectEvent(evt.id)}
                             className={`group block w-full text-left rounded-[5px] border pl-2 pr-1.5 py-0.5 text-[11px] leading-tight transition-all shadow-xs relative overflow-hidden cursor-pointer hover:brightness-105 active:scale-[0.99] ${
                               isActive
                                 ? "border-emerald-500/80 bg-emerald-950/20 dark:bg-emerald-900/20"
@@ -1047,7 +1071,7 @@ export function GuildCalendar({
                         <Button
                           size="sm"
                           className="w-full text-xs"
-                          onClick={() => setSelectedEventId(evt.id)}
+                          onClick={() => handleSelectEvent(evt.id)}
                         >
                           Otwórz wydarzenie & Zapisy →
                         </Button>
@@ -1064,7 +1088,7 @@ export function GuildCalendar({
       <EventDetailDialog
         eventId={selectedEventId}
         open={Boolean(selectedEventId)}
-        onOpenChange={(open) => !open && setSelectedEventId(null)}
+        onOpenChange={(open) => !open && handleSelectEvent(null)}
         currentUserId={currentUserId}
         isLeader={userIsAdmin}
         allGuildUsers={allGuildUsers}
