@@ -13,6 +13,7 @@ import { getDb } from "@/lib/db"
 import { runKillHelpers, runKills, runSyncs } from "@/lib/db/schema"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
 import { requireUser } from "@/lib/session"
+import { hasV3Access } from "@/lib/permissions"
 
 function revalidateRun() {
   revalidatePath("/run")
@@ -57,6 +58,7 @@ async function upsertSync(
 
 export async function recordQueenKill(): Promise<ActionResult> {
   const user = await requireUser()
+  if (!hasV3Access(user)) return fail("Wymagana rola V3.")
   const db = await getDb()
   const { now, date, slot, label } = stamp()
   await db.insert(runKills).values({
@@ -74,6 +76,7 @@ export async function recordQueenKill(): Promise<ActionResult> {
 
 export async function recordBaronKill(helperIds: string[]): Promise<ActionResult> {
   const user = await requireUser()
+  if (!hasV3Access(user)) return fail("Wymagana rola V3.")
   const db = await getDb()
   const { now, date, slot, label } = stamp()
   const killId = crypto.randomUUID()
@@ -103,6 +106,7 @@ export async function recordBaronKill(helperIds: string[]): Promise<ActionResult
 
 export async function undoKill(killId: string): Promise<ActionResult> {
   const user = await requireUser()
+  if (!hasV3Access(user)) return fail("Wymagana rola V3.")
   const db = await getDb()
   const kill = await db.query.runKills.findFirst({
     where: eq(runKills.id, killId),
@@ -126,6 +130,7 @@ export type SyncKind = (typeof SYNC_KINDS)[number]
 
 export async function syncRunTimer(kind: string, timeHms: string): Promise<ActionResult> {
   const user = await requireUser()
+  if (!hasV3Access(user)) return fail("Wymagana rola V3.")
   if (!SYNC_KINDS.includes(kind as SyncKind)) return fail("Nieznany timer.")
 
   const now = new Date()

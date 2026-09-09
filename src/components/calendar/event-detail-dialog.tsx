@@ -606,8 +606,21 @@ export function EventDetailDialog({
 
               {/* Main Content: Interactive Spots or Roster Panel */}
               <div className="p-6 flex flex-col gap-6">
-                {/* 1. V3 INTERACTIVE SPOTS LIST */}
-                {event.type === "v3" ? (
+                {event.restrictedAccess ? (
+                  <div className="flex flex-col items-center justify-center p-8 rounded-2xl border border-amber-500/30 bg-amber-500/5 text-center gap-3 my-4">
+                    <div className="h-12 w-12 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl">
+                      🔒
+                    </div>
+                    <div className="flex flex-col gap-1 max-w-md">
+                      <h3 className="font-heading font-bold text-base text-foreground">
+                        Szczegóły widoczne tylko dla Grupy V3
+                      </h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        To wydarzenie jest zarezerwowane dla stałej ekipy V3. Aby zobaczyć skład, zająć spot lub wziąć udział w akcji, musisz posiadać przypisaną rolę <strong>V3</strong> przez lidera gildii.
+                      </p>
+                    </div>
+                  </div>
+                ) : event.type === "v3" ? (
                   <div className="flex flex-col gap-4">
                     {/* User signup status banner if signed up */}
                     {mySignup ? (

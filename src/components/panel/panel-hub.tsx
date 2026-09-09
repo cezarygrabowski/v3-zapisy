@@ -29,6 +29,7 @@ export function PanelHub({
   currentUserId,
   currentUserNick,
   isLeader,
+  hasV3Role = true,
 }: {
   slot: { id: SlotId; label: string; status: "trwa" | "nastepny" | "skonczony" }
   roster: RosterMember[]
@@ -41,6 +42,7 @@ export function PanelHub({
   currentUserId: string
   currentUserNick?: string
   isLeader: boolean
+  hasV3Role?: boolean
 }) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<PanelTab>("default")
@@ -52,13 +54,15 @@ export function PanelHub({
   useEffect(() => {
     try {
       const savedTab = localStorage.getItem(PANEL_TAB_STORAGE_KEY) as PanelTab | null
-      if (savedTab && (savedTab === "v3" || savedTab === "default" || savedTab === "custom")) {
+      if (savedTab && (savedTab === "default" || savedTab === "custom" || (savedTab === "v3" && hasV3Role))) {
         setActiveTab(savedTab)
+      } else if (!hasV3Role && savedTab === "v3") {
+        setActiveTab("default")
       }
     } catch {
       // ignore
     }
-  }, [])
+  }, [hasV3Role])
 
   // 1-second live countdown ticker for second-screen experience
   useEffect(() => {
@@ -347,14 +351,16 @@ export function PanelHub({
           </Button>
 
           <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border shadow-xs">
-            <Button
-              size="sm"
-              variant={activeTab === "v3" ? "default" : "ghost"}
-              className="h-7 text-xs font-semibold px-2.5"
-              onClick={() => handleTabChange("v3")}
-            >
-              🕷️ V3
-            </Button>
+            {hasV3Role && (
+              <Button
+                size="sm"
+                variant={activeTab === "v3" ? "default" : "ghost"}
+                className="h-7 text-xs font-semibold px-2.5"
+                onClick={() => handleTabChange("v3")}
+              >
+                🕷️ V3
+              </Button>
+            )}
 
             <Button
               size="sm"

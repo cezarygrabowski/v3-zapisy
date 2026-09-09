@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache"
 import { calculateDurationHours, type RecurrenceType } from "@/lib/calendar-types"
 import { addDays, formatDatePl, getV3SignupOpenDate, isIsoDate, isV3SignupDateLocked } from "@/lib/dates"
 import { getDb } from "@/lib/db"
-import { guildEventSignups, guildEvents, users } from "@/lib/db/schema"
 import { getCurrentUser, requireUser } from "@/lib/session"
 import { and, eq } from "drizzle-orm"
+import { guildEventSignups, guildEvents, users } from "@/lib/db/schema"
+import { hasV3Access } from "@/lib/permissions"
+import { findUserById } from "@/lib/db/users"
 
 type ActionResult =
   | { ok: true; message?: string; eventId?: string }
@@ -160,8 +162,13 @@ export async function signUpForGuildEvent(input: {
 
   if (!event) return fail("Nie znaleziono wydarzenia.")
 
-  // For V3 events, block signups if event is 3 or more days in advance (max 2 days forward allowed)
+  // For V3 events, block signups if user does not have V3 access
   if (event.type === "v3") {
+    const targetUser = targetUserId === user.id ? user : await findUserById(targetUserId)
+    if (!targetUser || !hasV3Access(targetUser)) {
+      return fail("Tylko zweryfikowani członkowie z przypisaną rolą V3 mogą zapisywać się na V3.")
+    }
+
     const isSelfSignup = !input.targetUserId || targetUserId === user.id
     if ((isSelfSignup || !user.isLeader) && isV3SignupDateLocked(event.date)) {
       return fail(
@@ -540,14 +547,29 @@ export async function getGuildEventModalDetails(eventId: string) {
     const event = await getGuildEventDetails(eventId)
     if (!event) return null
 
-    if (event.type === "v3" && user) {
-      try {
-        const { checkUserFeeLock } = await import("@/lib/settings")
-        const currentUserFeeLock = await checkUserFeeLock(user.id)
-        return { ...event, currentUserFeeLock }
-      } catch (err) {
-        console.error("Error evaluating checkUserFeeLock in getGuildEventModalDetails:", err)
-        return event
+    if (event.type === "v3") {
+      const allowed = user ? hasV3Access(user) : false
+      if (!allowed) {
+        // Mask details for non-V3 members
+        return {
+          ...event,
+          description: null,
+          hourSlots: [],
+          signups: [],
+          allParticipants: [],
+          restrictedAccess: true,
+        }
+      }
+
+      if (user) {
+        try {
+          const { checkUserFeeLock } = await import("@/lib/settings")
+          const currentUserFeeLock = await checkUserFeeLock(user.id)
+          return { ...event, currentUserFeeLock, restrictedAccess: false }
+        } catch (err) {
+          console.error("Error evaluating checkUserFeeLock in getGuildEventModalDetails:", err)
+          return { ...event, restrictedAccess: false }
+        }
       }
     }
     return event

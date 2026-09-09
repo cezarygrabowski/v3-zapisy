@@ -10,8 +10,14 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   playstyle: text("playstyle"),
   isLeader: boolean("is_leader").notNull().default(false),
+  isVerified: boolean("is_verified").notNull().default(false),
+  roles: text("roles").notNull().default("[]"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const ROLE_V3 = "V3"
+export const PREDEFINED_ROLES = ["V3"] as const
+export type PredefinedRole = (typeof PREDEFINED_ROLES)[number]
 
 export const signups = pgTable(
   "signups",

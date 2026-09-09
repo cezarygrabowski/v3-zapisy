@@ -10,10 +10,13 @@ import {
   listTimerCategoriesWithTimers,
 } from "@/lib/timers-queries"
 
+import { hasV3Access } from "@/lib/permissions"
+
 export const dynamic = "force-dynamic"
 
 export default async function PanelPage() {
   const user = await requireUser()
+  const hasV3 = hasV3Access(user)
   const date = todayInWarsaw()
   const slot = relevantSlot()
 
@@ -21,17 +24,17 @@ export default async function PanelPage() {
   await ensureDefaultTimerCategories(user.id)
 
   const [roster, v3Kills, syncs, categories, killStats, users, rawV3Event, feeLock] = await Promise.all([
-    getSlotRoster(date, slot.id),
-    listKillsForDate(date),
-    listRunSyncs(),
+    hasV3 ? getSlotRoster(date, slot.id) : Promise.resolve([]),
+    hasV3 ? listKillsForDate(date) : Promise.resolve([]),
+    hasV3 ? listRunSyncs() : Promise.resolve([]),
     listTimerCategoriesWithTimers(),
-    listKillStats(null),
+    hasV3 ? listKillStats(null) : Promise.resolve([]),
     listUsers(),
-    getRelevantV3CalendarEvent(),
+    hasV3 ? getRelevantV3CalendarEvent() : Promise.resolve(null),
     checkUserFeeLock(user.id),
   ])
 
-  const v3CalendarEvent = rawV3Event
+  const v3CalendarEvent = (hasV3 && rawV3Event)
     ? { ...rawV3Event, currentUserFeeLock: feeLock }
     : null
 
@@ -51,6 +54,7 @@ export default async function PanelPage() {
       currentUserId={user.id}
       currentUserNick={user.gameNick}
       isLeader={user.isLeader}
+      hasV3Role={hasV3}
     />
   )
 }

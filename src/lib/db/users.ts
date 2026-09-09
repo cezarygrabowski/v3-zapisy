@@ -39,6 +39,8 @@ export async function upsertDiscordUser(input: {
       discordName: input.discordName,
       gameNick: input.discordName,
       isLeader: envLeader,
+      isVerified: envLeader,
+      roles: envLeader ? JSON.stringify(["V3"]) : "[]",
     })
     .returning()
   return created
@@ -69,6 +71,8 @@ export async function upsertDevUser(name: string, isLeader: boolean): Promise<Us
       discordName: nick,
       gameNick: nick,
       isLeader,
+      isVerified: true,
+      roles: JSON.stringify(["V3"]),
     })
     .returning()
   return created
@@ -115,6 +119,8 @@ export async function createPasswordUser(input: {
       passwordHash: await hashPassword(password),
       playstyle: input.playstyle,
       isLeader: input.isLeader,
+      isVerified: input.isLeader,
+      roles: input.isLeader ? JSON.stringify(["V3"]) : "[]",
     })
     .returning()
   return created

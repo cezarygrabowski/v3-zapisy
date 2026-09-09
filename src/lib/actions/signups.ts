@@ -15,6 +15,7 @@ import { getDb, isUniqueViolation } from "@/lib/db"
 import { signups, users } from "@/lib/db/schema"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
 import { requireLeader, requireUser } from "@/lib/session"
+import { hasV3Access } from "@/lib/permissions"
 
 function revalidateSignupPages() {
   revalidatePath("/", "layout")
@@ -37,6 +38,10 @@ export async function signUp(input: {
   position: string
 }): Promise<ActionResult> {
   const user = await requireUser()
+  if (!hasV3Access(user)) {
+    return fail("Tylko zweryfikowani członkowie z przypisaną rolą V3 mogą zapisywać się na V3.")
+  }
+
   const parsed = parseCell(input.date, input.slot, input.position)
   if ("error" in parsed && parsed.error) return fail(parsed.error)
 

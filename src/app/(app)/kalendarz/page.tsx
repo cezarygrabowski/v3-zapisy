@@ -4,6 +4,8 @@ import { addDays, isIsoDate, todayInWarsaw, weekStartForDate } from "@/lib/dates
 import { listUsers } from "@/lib/queries"
 import { requireUser } from "@/lib/session"
 
+import { hasV3Access } from "@/lib/permissions"
+
 export const dynamic = "force-dynamic"
 
 export default async function CalendarPage({
@@ -12,6 +14,7 @@ export default async function CalendarPage({
   searchParams: Promise<{ wydarzenie?: string; tydzien?: string }>
 }) {
   const user = await requireUser()
+  const hasV3 = hasV3Access(user)
   const { wydarzenie, tydzien } = await searchParams
   const today = todayInWarsaw()
   let startDate = addDays(today, -60) // 2 months back for history
@@ -25,7 +28,7 @@ export default async function CalendarPage({
     if (targetEnd > endDate) endDate = addDays(targetEnd, 14)
   }
 
-  const [events, users] = await Promise.all([
+  const [rawEvents, users] = await Promise.all([
     listGuildEvents({
       startDate,
       endDate,
@@ -35,11 +38,26 @@ export default async function CalendarPage({
     listUsers(),
   ])
 
+  // If user does not have V3 access, mask V3 events (keep them visible as scheduled, but hide counts, spots and description)
+  const events = rawEvents.map((evt) => {
+    if (evt.type === "v3" && !hasV3) {
+      return {
+        ...evt,
+        description: null,
+        totalSignups: 0,
+        uniqueUsersCount: 0,
+        mySignup: null,
+      }
+    }
+    return evt
+  })
+
   return (
     <GuildCalendar
       events={events}
       currentUserId={user.id}
       isLeader={user.isLeader}
+      hasV3Role={hasV3}
       allGuildUsers={users.map((u) => ({ id: u.id, gameNick: u.gameNick }))}
       initialEventId={wydarzenie}
       initialWeekStart={validWeekParam}

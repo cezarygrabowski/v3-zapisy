@@ -10,6 +10,7 @@ import {
 import { monthStartInWarsaw, weekStartInWarsaw } from "@/lib/dates"
 import { listKillStats, listStats } from "@/lib/queries"
 import { requireUser } from "@/lib/session"
+import { hasV3Access } from "@/lib/permissions"
 
 export const dynamic = "force-dynamic"
 
@@ -19,12 +20,34 @@ export default async function StatsPage({
   searchParams: Promise<{ zakres?: string }>
 }) {
   const user = await requireUser()
+  const hasV3 = hasV3Access(user)
   const params = await searchParams
   const range = params.zakres === "tydzien" || params.zakres === "wszystko" ? params.zakres : "miesiac"
   const fromDate =
     range === "tydzien" ? weekStartInWarsaw() : range === "miesiac" ? monthStartInWarsaw() : null
-  const rows = await listStats(fromDate)
-  const killRows = await listKillStats(fromDate)
+  const rows = hasV3 ? await listStats(fromDate) : []
+  const killRows = hasV3 ? await listKillStats(fromDate) : []
+
+  if (!hasV3) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="font-heading text-2xl font-semibold">Statystyki V3</h1>
+          <p className="text-sm text-muted-foreground">
+            Podsumowania wejść i zbić na V3.
+          </p>
+        </div>
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>🔒 Dostęp zastrzeżony dla Grupy V3</EmptyTitle>
+            <EmptyDescription>
+              Statystyki wejść, obsady miejscówek oraz zbić bossów na V3 są widoczne wyłącznie dla członków z przypisaną rolą V3.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">

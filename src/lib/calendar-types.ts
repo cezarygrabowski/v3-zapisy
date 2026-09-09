@@ -290,6 +290,7 @@ export type EventDetails = {
   signups: EventSignupEntry[]
   allParticipants: { userId: string; gameNick: string; count: number; attendedCount: number }[]
   currentUserFeeLock?: UserFeeLockInfo
+  restrictedAccess?: boolean
 }
 
 export type UserFeeLockInfo = {

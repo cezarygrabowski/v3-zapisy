@@ -33,6 +33,8 @@ export default async function AdminPage() {
           hasDiscord: Boolean(user.discordId),
           playstyle: user.playstyle,
           isLeader: user.isLeader,
+          isVerified: user.isVerified ?? false,
+          roles: user.roles || "[]",
         }))}
       />
     </div>

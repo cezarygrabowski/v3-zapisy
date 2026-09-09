@@ -35,6 +35,7 @@ export function GuildCalendar({
   currentUserId = "",
   isLeader = false,
   isAdmin = false,
+  hasV3Role = true,
   allGuildUsers = [],
   initialEventId,
   initialWeekStart,
@@ -43,6 +44,7 @@ export function GuildCalendar({
   currentUserId?: string
   isLeader?: boolean
   isAdmin?: boolean
+  hasV3Role?: boolean
   allGuildUsers?: { id: string; gameNick: string }[]
   initialEventId?: string
   initialWeekStart?: string
@@ -996,7 +998,13 @@ export function GuildCalendar({
                                   <span className="truncate">
                                     {meta.label}
                                   </span>
-                                  <span className="font-medium shrink-0 ml-1">{evt.uniqueUsersCount} os.</span>
+                                  {evt.type === "v3" && !hasV3Role ? (
+                                    <span className="font-semibold text-amber-500 shrink-0 ml-1 flex items-center gap-0.5">
+                                      🔒 Grupa V3
+                                    </span>
+                                  ) : (
+                                    <span className="font-medium shrink-0 ml-1">{evt.uniqueUsersCount} os.</span>
+                                  )}
                                 </div>
                               ) : null}
 
@@ -1258,7 +1266,11 @@ export function GuildCalendar({
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Zapisanych:</span>
                           <span className="font-medium">
-                            {evt.uniqueUsersCount} osób ({evt.totalSignups} pozycji)
+                            {evt.type === "v3" && !hasV3Role ? (
+                              <span className="text-amber-500 font-semibold">🔒 Grupa V3 (Dostęp ograniczony)</span>
+                            ) : (
+                              `${evt.uniqueUsersCount} osób (${evt.totalSignups} pozycji)`
+                            )}
                           </span>
                         </div>
                       </div>

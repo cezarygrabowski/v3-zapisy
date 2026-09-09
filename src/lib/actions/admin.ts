@@ -152,3 +152,72 @@ export async function setFeeSettlementDays(days: number): Promise<ActionResult> 
   return ok("Zapisano czas na uregulowanie składki.")
 }
 
+export async function setUserVerified(userId: string, isVerified: boolean): Promise<ActionResult> {
+  await requireLeader()
+  const db = await getDb()
+  const target = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  })
+  if (!target) return fail("Nie znaleziono użytkownika.")
+
+  await db.update(users).set({ isVerified }).where(eq(users.id, userId))
+  revalidatePath("/", "layout")
+  revalidatePath("/admin")
+  return ok(isVerified ? "Użytkownik został zweryfikowany." : "Cofnięto weryfikację użytkownika.")
+}
+
+export async function setUserRoles(userId: string, roles: string[]): Promise<ActionResult> {
+  await requireLeader()
+  const db = await getDb()
+  const target = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  })
+  if (!target) return fail("Nie znaleziono użytkownika.")
+
+  const cleanRoles = Array.from(new Set(roles.map((r) => r.trim()).filter(Boolean)))
+  await db
+    .update(users)
+    .set({ roles: JSON.stringify(cleanRoles) })
+    .where(eq(users.id, userId))
+
+  revalidatePath("/", "layout")
+  revalidatePath("/admin")
+  revalidatePath("/kalendarz")
+  revalidatePath("/panel")
+  return ok("Zaktualizowano role użytkownika.")
+}
+
+export async function toggleUserRole(userId: string, role: string): Promise<ActionResult> {
+  await requireLeader()
+  const db = await getDb()
+  const target = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  })
+  if (!target) return fail("Nie znaleziono użytkownika.")
+
+  let currentRoles: string[] = []
+  try {
+    currentRoles = target.roles ? JSON.parse(target.roles) : []
+  } catch {
+    currentRoles = []
+  }
+
+  const roleClean = role.trim()
+  const has = currentRoles.includes(roleClean)
+  const nextRoles = has
+    ? currentRoles.filter((r) => r !== roleClean)
+    : [...currentRoles, roleClean]
+
+  await db
+    .update(users)
+    .set({ roles: JSON.stringify(nextRoles) })
+    .where(eq(users.id, userId))
+
+  revalidatePath("/", "layout")
+  revalidatePath("/admin")
+  revalidatePath("/kalendarz")
+  revalidatePath("/panel")
+  return ok(has ? `Usunięto rolę ${roleClean}.` : `Nadano rolę ${roleClean}.`)
+}
+
+
