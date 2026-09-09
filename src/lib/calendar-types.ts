@@ -9,6 +9,12 @@ export const V3_EVENT_SPOTS = [
   { id: "R1", name: "R1", desc: "Żółty, od wejścia w górę", color: "#F4D03F" },
   { id: "R2", name: "R2", desc: "Brąz z koronami, lewo", color: "#C48A55" },
   { id: "R3", name: "R3", desc: "Seledyn, góra-lewo", color: "#9BB6BA" },
+  {
+    id: "R2_R3_KORYTARZ",
+    name: "R2 - R3 korytarz",
+    desc: "Cyan, korytarz (32, 31, 30, 29, 28, 26, 20)",
+    color: "#06B6D4",
+  },
   { id: "PRAWO", name: "Prawo", desc: "Brąz, góra-prawo", color: "#8B5A2B" },
   { id: "R1_KORYTARZ", name: "R1 korytarz", desc: "Fiolet, środek-dół", color: "#9B6BDB" },
   { id: "PRAWO_KORYTARZ", name: "Prawo korytarz", desc: "Róż, prawo-dół", color: "#F5C6CE" },
@@ -283,4 +289,17 @@ export type EventDetails = {
   }[]
   signups: EventSignupEntry[]
   allParticipants: { userId: string; gameNick: string; count: number; attendedCount: number }[]
+  currentUserFeeLock?: UserFeeLockInfo
 }
+
+export type UserFeeLockInfo = {
+  isLocked: boolean
+  overdueKk: number
+  settlementDays: number
+  deadlineDate: string
+  deadlineDatePl: string
+  hasPendingPayment: boolean
+  pendingAmountKk: number
+  reason?: string
+}
+

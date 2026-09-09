@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache"
 import { calculateDurationHours, type RecurrenceType } from "@/lib/calendar-types"
-import { addDays, isIsoDate } from "@/lib/dates"
+import { addDays, formatDatePl, getV3SignupOpenDate, isIsoDate, isV3SignupDateLocked } from "@/lib/dates"
 import { getDb } from "@/lib/db"
 import { guildEventSignups, guildEvents, users } from "@/lib/db/schema"
-import { requireUser } from "@/lib/session"
+import { getCurrentUser, requireUser } from "@/lib/session"
 import { and, eq } from "drizzle-orm"
 
 type ActionResult =
@@ -152,12 +152,35 @@ export async function signUpForGuildEvent(input: {
     .select({
       id: guildEvents.id,
       type: guildEvents.type,
+      date: guildEvents.date,
       maxParticipants: guildEvents.maxParticipants,
     })
     .from(guildEvents)
     .where(eq(guildEvents.id, input.eventId))
 
   if (!event) return fail("Nie znaleziono wydarzenia.")
+
+  // For V3 events, block signups if event is 3 or more days in advance (max 2 days forward allowed)
+  if (event.type === "v3") {
+    const isSelfSignup = !input.targetUserId || targetUserId === user.id
+    if ((isSelfSignup || !user.isLeader) && isV3SignupDateLocked(event.date)) {
+      return fail(
+        `Zapisy na ten event V3 ruszają na 2 dni przed wydarzeniem (od ${formatDatePl(getV3SignupOpenDate(event.date))}).`
+      )
+    }
+
+    // Check fee settlement lock: if user has unpaid fees from previous week (and grace period expired)
+    if (isSelfSignup || !user.isLeader) {
+      const { checkUserFeeLock } = await import("@/lib/settings")
+      const feeLock = await checkUserFeeLock(targetUserId)
+      if (feeLock.isLocked) {
+        return fail(
+          feeLock.reason ??
+            `Nie możesz zapisać się na V3: masz nieuregulowaną składkę za poprzedni tydzień (${feeLock.overdueKk} kk). Ureguluj ją w zakładce Składki.`
+        )
+      }
+    }
+  }
 
   // If spot is provided (e.g. V3 spot R1 or Red Las spot), check if spot is already taken
   if (input.spot) {
@@ -467,7 +490,7 @@ export async function updateGuildEventProperties(input: {
   if (input.description !== undefined) updates.description = input.description.trim() || null
 
   if (input.startTime && input.endTime) {
-    updates.durationHours = calculateDurationHours(input.startTime, input.endTime)
+    updates.durationHours = Math.max(1, Math.round(calculateDurationHours(input.startTime, input.endTime)))
   }
 
   // Single event date can only be changed when not updating all series dates
@@ -511,9 +534,27 @@ export async function updateGuildEventProperties(input: {
 }
 
 export async function getGuildEventModalDetails(eventId: string) {
-  const { getGuildEventDetails } = await import("@/lib/calendar-queries")
-  const event = await getGuildEventDetails(eventId)
-  return event
+  try {
+    const user = await getCurrentUser()
+    const { getGuildEventDetails } = await import("@/lib/calendar-queries")
+    const event = await getGuildEventDetails(eventId)
+    if (!event) return null
+
+    if (event.type === "v3" && user) {
+      try {
+        const { checkUserFeeLock } = await import("@/lib/settings")
+        const currentUserFeeLock = await checkUserFeeLock(user.id)
+        return { ...event, currentUserFeeLock }
+      } catch (err) {
+        console.error("Error evaluating checkUserFeeLock in getGuildEventModalDetails:", err)
+        return event
+      }
+    }
+    return event
+  } catch (err) {
+    console.error("Error in getGuildEventModalDetails:", err)
+    return null
+  }
 }
 
 

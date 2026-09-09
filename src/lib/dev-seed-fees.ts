@@ -7,9 +7,10 @@ import {
   type PositionId,
   type SlotId,
 } from "@/lib/constants"
+import { V3_EVENT_SPOTS } from "@/lib/calendar-types"
 import { addDays, todayInWarsaw, weekStartInWarsaw } from "@/lib/dates"
 import { getDb } from "@/lib/db"
-import { feePayments, signups, users } from "@/lib/db/schema"
+import { feePayments, guildEvents, guildEventSignups, signups, users } from "@/lib/db/schema"
 import { upsertDevUser } from "@/lib/db/users"
 import { isPaymentOfferAmount } from "@/lib/fees"
 import { getFeeLedger } from "@/lib/queries"
@@ -52,7 +53,68 @@ export async function seedTwoWeeksFeeHistory(leaderId: string): Promise<{
     people.push({ id: row.id, nick: member.nick, playstyle: member.playstyle })
   }
 
-  const existing = await db
+  // 1. Ensure daily V3 calendar events exist for the past 2 weeks and current week
+  const existingGuildEvents = await db
+    .select({
+      id: guildEvents.id,
+      date: guildEvents.date,
+      startTime: guildEvents.startTime,
+      type: guildEvents.type,
+    })
+    .from(guildEvents)
+    .where(and(gte(guildEvents.date, fromDate), lte(guildEvents.date, today), eq(guildEvents.type, "v3")))
+
+  const eventMap = new Map<string, string>() // `${date}:${startTime}` -> eventId
+  for (const ge of existingGuildEvents) {
+    eventMap.set(`${ge.date}:${ge.startTime}`, ge.id)
+  }
+
+  // Define two V3 slots per day (morning 11:30 and evening 18:00)
+  const dailySlots = [
+    { title: "V3 11:30-14:30", startTime: "11:30", endTime: "14:30", color: "blue" },
+    { title: "V3 18:00-21:00", startTime: "18:00", endTime: "21:00", color: "brown" },
+  ]
+
+  // Create events for any missing days/slots
+  let currDate = fromDate
+  while (currDate <= today) {
+    for (const slotDef of dailySlots) {
+      const key = `${currDate}:${slotDef.startTime}`
+      if (!eventMap.has(key)) {
+        const newEventId = crypto.randomUUID()
+        await db.insert(guildEvents).values({
+          id: newEventId,
+          title: slotDef.title,
+          type: "v3",
+          date: currDate,
+          startTime: slotDef.startTime,
+          endTime: slotDef.endTime,
+          durationHours: 3,
+          color: slotDef.color,
+          status: "finished",
+          signupMode: "spots",
+          recurrence: "none",
+          createdBy: leaderId,
+        })
+        eventMap.set(key, newEventId)
+      }
+    }
+    currDate = addDays(currDate, 1)
+  }
+
+  // 2. Fetch existing signups in both guildEventSignups and legacy signups
+  const existingGuildSignups = await db
+    .select({
+      eventId: guildEventSignups.eventId,
+      userId: guildEventSignups.userId,
+      spot: guildEventSignups.spot,
+    })
+    .from(guildEventSignups)
+
+  const takenGuildSpots = new Set(existingGuildSignups.map((s) => `${s.eventId}:${s.spot}`))
+  const userInGuildEvent = new Set(existingGuildSignups.map((s) => `${s.eventId}:${s.userId}`))
+
+  const existingLegacy = await db
     .select({
       date: signups.date,
       slot: signups.slot,
@@ -62,10 +124,12 @@ export async function seedTwoWeeksFeeHistory(leaderId: string): Promise<{
     .from(signups)
     .where(and(gte(signups.date, fromDate), lte(signups.date, today)))
 
-  const takenCell = new Set(existing.map((row) => `${row.date}:${row.slot}:${row.position}`))
-  const takenDay = new Set(existing.map((row) => `${row.date}:${row.userId}`))
-  const free = cells()
+  const takenCell = new Set(existingLegacy.map((row) => `${row.date}:${row.slot}:${row.position}`))
+  const takenDay = new Set(existingLegacy.map((row) => `${row.date}:${row.userId}`))
+  const freeLegacy = cells()
   let inserted = 0
+
+  const availableSpots = V3_EVENT_SPOTS.map((s) => s.id)
 
   for (const member of CAST) {
     const person = people.find((item) => item.nick === member.nick)
@@ -75,20 +139,50 @@ export async function seedTwoWeeksFeeHistory(leaderId: string): Promise<{
       for (const weekday of member.weekdays) {
         const date = addDays(weekStart, weekday)
         if (date > today) continue
-        if (takenDay.has(`${date}:${person.id}`)) continue
-        const cell = free.find((item) => !takenCell.has(`${date}:${item.slot}:${item.position}`))
-        if (!cell) continue
-        await db.insert(signups).values({
+
+        // Pick an event on that date (prefer 11:30, fallback to 18:00)
+        let targetEventId = eventMap.get(`${date}:11:30`)
+        if (targetEventId && userInGuildEvent.has(`${targetEventId}:${person.id}`)) {
+          targetEventId = eventMap.get(`${date}:18:00`)
+        }
+        if (!targetEventId) continue
+        if (userInGuildEvent.has(`${targetEventId}:${person.id}`)) continue
+
+        // Find free spot in this event
+        const freeSpot = availableSpots.find((sp) => !takenGuildSpots.has(`${targetEventId}:${sp}`))
+        if (!freeSpot) continue
+
+        // Insert into guildEventSignups (what getFeeLedger actually uses!)
+        await db.insert(guildEventSignups).values({
           id: crypto.randomUUID(),
-          date,
-          slot: cell.slot,
-          position: cell.position,
+          eventId: targetEventId,
           userId: person.id,
-          feeKk: feeForPlaystyle(person.playstyle),
-          paid: false,
+          hourIndex: 0,
+          spot: freeSpot,
+          role: person.playstyle === "pvp" ? "PvP" : "PvM",
+          attended: true,
         })
-        takenCell.add(`${date}:${cell.slot}:${cell.position}`)
-        takenDay.add(`${date}:${person.id}`)
+        takenGuildSpots.add(`${targetEventId}:${freeSpot}`)
+        userInGuildEvent.add(`${targetEventId}:${person.id}`)
+
+        // Also insert into legacy signups table for backward compatibility
+        if (!takenDay.has(`${date}:${person.id}`)) {
+          const cell = freeLegacy.find((item) => !takenCell.has(`${date}:${item.slot}:${item.position}`))
+          if (cell) {
+            await db.insert(signups).values({
+              id: crypto.randomUUID(),
+              date,
+              slot: cell.slot,
+              position: cell.position,
+              userId: person.id,
+              feeKk: feeForPlaystyle(person.playstyle),
+              paid: false,
+            })
+            takenCell.add(`${date}:${cell.slot}:${cell.position}`)
+            takenDay.add(`${date}:${person.id}`)
+          }
+        }
+
         inserted += 1
       }
     }

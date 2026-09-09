@@ -202,3 +202,21 @@ export function formatDatePl(isoDate: string): string {
     year: "numeric",
   }).format(new Date(Date.UTC(year, month - 1, day, 12)))
 }
+
+/**
+ * Checks if signing up for a V3 event is locked based on its date.
+ * Allowed: today, tomorrow, and the day after tomorrow (max 2 days forward).
+ * Locked: 3 days or more in advance (date > today + 2 days).
+ */
+export function isV3SignupDateLocked(eventDate: string, now = new Date()): boolean {
+  const today = todayInWarsaw(now)
+  const maxAllowedDate = addDays(today, 2)
+  return eventDate > maxAllowedDate
+}
+
+/**
+ * Returns the ISO date string when signups open for a V3 event (2 days before the event).
+ */
+export function getV3SignupOpenDate(eventDate: string): string {
+  return addDays(eventDate, -2)
+}

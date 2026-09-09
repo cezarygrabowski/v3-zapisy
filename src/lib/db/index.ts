@@ -7,8 +7,12 @@ type AppDb = {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 } & ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>
 
+const SCHEMA_VERSION = 2
+
 const globalForDb = globalThis as unknown as {
   dbPromise?: Promise<AppDb>
+  schemaVersion?: number
+  schemaPromise?: Promise<void>
 }
 
 const SCHEMA_SQL = [
@@ -190,6 +194,12 @@ const SCHEMA_SQL = [
       created_at timestamptz NOT NULL DEFAULT now()
     )`,
   `ALTER TABLE guild_event_signups ADD COLUMN IF NOT EXISTS spot text`,
+  `CREATE TABLE IF NOT EXISTS guild_settings (
+      key text PRIMARY KEY,
+      value text NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      updated_by text REFERENCES users(id)
+    )`,
 ]
 
 async function ensureSchema(db: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }) {
@@ -206,6 +216,7 @@ async function createDb(): Promise<AppDb> {
     const { drizzle } = await import("drizzle-orm/neon-http")
     const db = drizzle(neon(databaseUrl), { schema })
     await ensureSchema(db)
+    globalForDb.schemaVersion = SCHEMA_VERSION
     return db as unknown as AppDb
   }
 
@@ -225,6 +236,7 @@ async function createDb(): Promise<AppDb> {
   await client.waitReady
   const db = drizzle({ client, schema }) as unknown as AppDb
   await ensureSchema(db)
+  globalForDb.schemaVersion = SCHEMA_VERSION
   return db
 }
 
@@ -235,7 +247,24 @@ export async function getDb(): Promise<AppDb> {
       throw error
     })
   }
-  return globalForDb.dbPromise
+
+  const db = await globalForDb.dbPromise
+
+  // Ensure latest schema has run even if dbPromise was cached on globalThis across HMR
+  if (globalForDb.schemaVersion !== SCHEMA_VERSION) {
+    if (!globalForDb.schemaPromise) {
+      globalForDb.schemaPromise = ensureSchema(db)
+        .then(() => {
+          globalForDb.schemaVersion = SCHEMA_VERSION
+        })
+        .finally(() => {
+          globalForDb.schemaPromise = undefined
+        })
+    }
+    await globalForDb.schemaPromise
+  }
+
+  return db
 }
 
 export function isUniqueViolation(error: unknown): boolean {

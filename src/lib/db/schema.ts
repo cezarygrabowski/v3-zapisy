@@ -394,6 +394,20 @@ export const guildEventSignupsRelations = relations(guildEventSignups, ({ one })
   }),
 }))
 
+export const guildSettings = pgTable("guild_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: text("updated_by").references(() => users.id),
+})
+
+export const guildSettingsRelations = relations(guildSettings, ({ one }) => ({
+  updater: one(users, {
+    fields: [guildSettings.updatedBy],
+    references: [users.id],
+  }),
+}))
+
 export type User = typeof users.$inferSelect
 export type Signup = typeof signups.$inferSelect
 export type FeePayment = typeof feePayments.$inferSelect
@@ -408,3 +422,4 @@ export type CustomTimer = typeof customTimers.$inferSelect
 export type CustomTimerKill = typeof customTimerKills.$inferSelect
 export type GuildEvent = typeof guildEvents.$inferSelect
 export type GuildEventSignup = typeof guildEventSignups.$inferSelect
+export type GuildSetting = typeof guildSettings.$inferSelect

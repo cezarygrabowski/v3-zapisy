@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache"
 import { and, eq, ne, sql } from "drizzle-orm"
 import { isPlaystyle } from "@/lib/constants"
 import { getDb, isUniqueViolation } from "@/lib/db"
-import { users } from "@/lib/db/schema"
+import { guildSettings, users } from "@/lib/db/schema"
 import { createPasswordUser, findUserById } from "@/lib/db/users"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
 import { hashPassword, parseLogin, parsePassword } from "@/lib/password"
 import { requireLeader } from "@/lib/session"
+import { SETTING_KEY_FEE_SETTLEMENT_DAYS } from "@/lib/settings"
 
 export async function setLeader(userId: string, isLeader: boolean): Promise<ActionResult> {
   const actor = await requireLeader()
@@ -119,3 +120,35 @@ export async function setUserPassword(input: {
   revalidatePath("/admin")
   return ok("Zapisano login i hasło.")
 }
+
+export async function setFeeSettlementDays(days: number): Promise<ActionResult> {
+  const leader = await requireLeader()
+  if (!Number.isInteger(days) || days < 0 || days > 14) {
+    return fail("Liczba dni musi być liczbą całkowitą od 0 do 14.")
+  }
+
+  const db = await getDb()
+  await db
+    .insert(guildSettings)
+    .values({
+      key: SETTING_KEY_FEE_SETTLEMENT_DAYS,
+      value: String(days),
+      updatedAt: new Date(),
+      updatedBy: leader.id,
+    })
+    .onConflictDoUpdate({
+      target: guildSettings.key,
+      set: {
+        value: String(days),
+        updatedAt: new Date(),
+        updatedBy: leader.id,
+      },
+    })
+
+  revalidatePath("/admin")
+  revalidatePath("/kalendarz")
+  revalidatePath("/skladki")
+  revalidatePath("/panel")
+  return ok("Zapisano czas na uregulowanie składki.")
+}
+

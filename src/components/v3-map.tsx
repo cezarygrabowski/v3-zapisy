@@ -52,8 +52,10 @@ function numberColor(fill: string, isQueen: boolean) {
 
 export function V3Map({
   roster,
+  myPosition,
 }: {
   roster: MapOccupant[]
+  myPosition?: PositionId | null
 }) {
   const [selected, setSelected] = useState<PositionId | null>(null)
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null)
@@ -85,6 +87,7 @@ export function V3Map({
       x: pinned?.x ?? bucket.x / bucket.n,
       y: pinned?.y ?? bucket.y / bucket.n - 36,
       nick: nickByPosition.get(position),
+      isMine: myPosition === position,
     }
   })
 
@@ -141,6 +144,10 @@ export function V3Map({
               .filter(Boolean)
               .join(" · ")
 
+            const isMyZone = Boolean(myPosition && zone === myPosition)
+            const strokeColor = isRoomSelected || isSelected ? "#111" : isMyZone ? "#0891b2" : "#1a1a1a"
+            const strokeW = isRoomSelected ? 4 : isSelected ? 3 : isMyZone ? 3.5 : 2.5
+
             return (
               <g
                 key={room.id}
@@ -168,8 +175,8 @@ export function V3Map({
                   height={size}
                   rx={4}
                   fill={fillColor}
-                  stroke={isRoomSelected || isSelected ? "#111" : "#1a1a1a"}
-                  strokeWidth={isRoomSelected ? 4 : isSelected ? 3 : 2.5}
+                  stroke={strokeColor}
+                  strokeWidth={strokeW}
                 />
                 {room.kind === "queen" ? (
                   <Crown x={room.x} y={room.y - size / 2 - 2} />
@@ -209,25 +216,25 @@ export function V3Map({
             label.nick ? (
               <g key={label.position}>
                 <rect
-                  x={label.x - 52}
+                  x={label.isMine ? label.x - 58 : label.x - 52}
                   y={label.y - 12}
-                  width={104}
+                  width={label.isMine ? 116 : 104}
                   height={22}
                   rx={6}
-                  fill="white"
-                  fillOpacity={0.92}
-                  stroke="#222"
-                  strokeWidth={1}
+                  fill={label.isMine ? "#ecfeff" : "white"}
+                  fillOpacity={0.96}
+                  stroke={label.isMine ? "#0891b2" : "#222"}
+                  strokeWidth={label.isMine ? 2 : 1}
                 />
                 <text
                   x={label.x}
                   y={label.y + 4}
                   textAnchor="middle"
-                  fontSize={13}
-                  fontWeight={700}
-                  fill="#111"
+                  fontSize={label.isMine ? 12 : 13}
+                  fontWeight={label.isMine ? 800 : 700}
+                  fill={label.isMine ? "#0e7490" : "#111"}
                 >
-                  {label.nick}
+                  {label.isMine ? `${label.nick} (Ty)` : label.nick}
                 </text>
               </g>
             ) : null
@@ -255,14 +262,16 @@ export function V3Map({
         {MAP_ZONES.map((zone) => {
           const nick = nickByPosition.get(zone.position)
           const active = occupiedPositions.has(zone.position)
+          const isMine = myPosition === zone.position
           return (
             <li key={zone.position}>
               <button
                 type="button"
                 onClick={() => setSelected(zone.position)}
                 className={cn(
-                  "flex items-center gap-2 rounded-lg px-2 py-1 text-sm ring-1 ring-foreground/15",
+                  "flex items-center gap-2 rounded-lg px-2 py-1 text-sm ring-1 ring-foreground/15 transition-all",
                   selected === zone.position && "ring-2 ring-foreground",
+                  isMine && "ring-2 ring-cyan-500 bg-cyan-500/10 font-medium",
                   !active && "opacity-50"
                 )}
               >
@@ -271,7 +280,9 @@ export function V3Map({
                   style={{ backgroundColor: ZONE_COLORS[zone.position] }}
                 />
                 {positionLabel(zone.position)}
-                <span className="text-muted-foreground">{nick ?? "—"}</span>
+                <span className={cn("text-muted-foreground", isMine && "text-cyan-700 dark:text-cyan-300 font-bold")}>
+                  {nick ? (isMine ? `${nick} (Ty)` : nick) : "—"}
+                </span>
               </button>
             </li>
           )

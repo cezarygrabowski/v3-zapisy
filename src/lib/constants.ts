@@ -9,6 +9,7 @@ export const POSITIONS = [
   { id: "R1", label: "R1" },
   { id: "R2", label: "R2" },
   { id: "R3", label: "R3" },
+  { id: "R2_R3_KORYTARZ", label: "R2 - R3 korytarz" },
   { id: "PRAWO", label: "Prawo" },
   { id: "R1_KORYTARZ", label: "R1 korytarz" },
   { id: "PRAWO_KORYTARZ", label: "Prawo korytarz" },
@@ -47,8 +48,11 @@ export function slotLabel(id: SlotId): string {
   return SLOTS.find((s) => s.id === id)?.label ?? id
 }
 
-export function positionLabel(id: PositionId): string {
-  return POSITIONS.find((p) => p.id === id)?.label ?? id
+export function positionLabel(id: string | null | undefined): string {
+  if (!id) return ""
+  const match = POSITIONS.find((p) => p.id === id)
+  if (match) return match.label
+  return id.replace(/_/g, " ")
 }
 
 export function playstyleLabel(playstyle: Playstyle): string {
@@ -77,6 +81,7 @@ export const MAP_ZONES: {
   { position: "R1", color: "#F4D03F", note: "żółty, od wejścia w górę" },
   { position: "R2", color: "#C48A55", note: "brąz z koronami, lewo" },
   { position: "R3", color: "#9BB6BA", note: "seledyn, góra-lewo" },
+  { position: "R2_R3_KORYTARZ", color: "#06B6D4", note: "cyan, korytarz (32–20)" },
   { position: "PRAWO", color: "#8B5A2B", note: "brąz, góra-prawo" },
   { position: "PRAWO_KORYTARZ", color: "#F5C6CE", note: "róż, prawo-dół" },
 ]

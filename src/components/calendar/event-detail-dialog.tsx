@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useTransition } from "react"
+import Link from "next/link"
 import { Check, Link2 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -22,7 +23,8 @@ import {
   type EventDetails,
   type GuildEventType,
 } from "@/lib/calendar-types"
-import { formatDatePl } from "@/lib/dates"
+import { formatDatePl, getV3SignupOpenDate, isV3SignupDateLocked } from "@/lib/dates"
+import { positionLabel } from "@/lib/constants"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -120,10 +122,14 @@ export function EventDetailDialog({
 
   function refreshDetails() {
     if (!eventId) return
-    getGuildEventModalDetails(eventId).then((data) => {
-      if (data) setEvent(data)
-      onEventUpdated?.()
-    })
+    getGuildEventModalDetails(eventId)
+      .then((data) => {
+        if (data) setEvent(data)
+        onEventUpdated?.()
+      })
+      .catch((err) => {
+        console.error("Failed to refresh event details:", err)
+      })
   }
 
   function handleSpotSignUp(spotId: string, role?: string) {
@@ -285,6 +291,12 @@ export function EventDetailDialog({
   const colorPreset = event ? getEventColorPreset(event.color) : null
   const mySignup = event?.signups.find((s) => s.userId === currentUserId)
   const canManage = Boolean(event && (isLeader || event.createdById === currentUserId))
+  const isV3 = event?.type === "v3"
+  const isDateLocked = Boolean(event && isV3 && isV3SignupDateLocked(event.date))
+  const unlockDatePl = event && isV3 ? formatDatePl(getV3SignupOpenDate(event.date)) : ""
+  const feeLock = isV3 ? event?.currentUserFeeLock : undefined
+  const isFeeLocked = Boolean(feeLock?.isLocked)
+  const isLocked = isDateLocked || isFeeLocked
 
   return (
     <>
@@ -328,9 +340,21 @@ export function EventDetailDialog({
                         <Badge variant="outline" className="text-xs">Zaplanowane</Badge>
                       )}
 
-                      {event.recurrence && event.recurrence !== "none" ? (
-                        <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                          🔄 {event.recurrence}
+                      {isFeeLocked ? (
+                        <Badge
+                          variant="destructive"
+                          className="text-xs gap-1 font-medium bg-red-600/90 hover:bg-red-700 text-white"
+                        >
+                          <span>⚠️</span>
+                          <span>Zaległa składka ({feeLock?.overdueKk} kk)</span>
+                        </Badge>
+                      ) : isDateLocked ? (
+                        <Badge
+                          variant="outline"
+                          className="text-xs border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10 gap-1 font-medium"
+                        >
+                          <span>🔒</span>
+                          <span>Zapisy od {unlockDatePl}</span>
                         </Badge>
                       ) : null}
                     </div>
@@ -591,7 +615,7 @@ export function EventDetailDialog({
                         className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${colorPreset.cardBg} ${colorPreset.cardBorder}`}
                       >
                         <Badge className={`${colorPreset.badgeClass} text-xs px-2.5 py-1 font-medium`}>
-                          Twój spot: {mySignup.spot} {mySignup.role ? `(${mySignup.role})` : ""}
+                          Twój spot: {positionLabel(mySignup.spot)} {mySignup.role ? `(${mySignup.role})` : ""}
                         </Badge>
                         <Button
                           size="xs"
@@ -605,12 +629,56 @@ export function EventDetailDialog({
                       </div>
                     ) : null}
 
+                    {/* Fee lock banner if user owes fee for previous week and grace period expired */}
+                    {isFeeLocked ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-destructive/40 bg-destructive/10 text-destructive dark:text-red-300 text-xs shadow-xs">
+                        <div className="flex items-start gap-3">
+                          <span className="text-lg shrink-0 select-none">⚠️</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-sm">
+                              Zapisy zablokowane: Nieuregulowana składka ({feeLock?.overdueKk} kk)
+                            </span>
+                            <span className="text-[11px] opacity-90 leading-relaxed">
+                              {feeLock?.reason ??
+                                `Zalegasz ze składką za poprzedni tydzień (${feeLock?.overdueKk} kk). Minął termin ${feeLock?.settlementDays} dni na jej opłacenie (${feeLock?.deadlineDatePl}). Ureguluj składkę w zakładce Składki, aby móc zapisywać się na V3.`}
+                            </span>
+                          </div>
+                        </div>
+                        <Link
+                          href="/skladki"
+                          className="inline-flex items-center justify-center rounded-lg bg-destructive text-destructive-foreground px-3.5 py-1.5 text-xs font-semibold shrink-0 hover:bg-destructive/90 transition-colors shadow-xs self-start sm:self-center"
+                        >
+                          Przejdź do składek →
+                        </Link>
+                      </div>
+                    ) : isDateLocked ? (
+                      <div className="flex items-start gap-3 p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs shadow-xs">
+                        <span className="text-base shrink-0 select-none">🔒</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-sm">
+                            Zapisy na ten event V3 ruszają na 2 dni przed wydarzeniem
+                          </span>
+                          <span className="text-[11px] opacity-90 leading-relaxed">
+                            Można wpisywać się na wydarzenia w bieżącym dniu, jutrzejszym oraz pojutrzejszym (maksymalnie 2 dni do przodu). Zapisy dla graczy zostaną otwarte:{" "}
+                            <strong className="font-bold underline underline-offset-2">{unlockDatePl}</strong>.
+                            {isLeader ? " Jako lider możesz w razie potrzeby ręcznie zapisać gracza opcją '+ Wpisz'." : ""}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+
                     {/* Vertical list of spots - one under another */}
                     <div className="flex flex-col gap-2.5">
                       {V3_EVENT_SPOTS.map((spot) => {
                         const spotSignup = event.signups.find((s) => s.spot === spot.id)
-                        const isMine = spotSignup?.userId === currentUserId
-                        const canToggle = spotSignup && (isLeader || spotSignup.userId === currentUserId)
+                        const currentUserNick = allGuildUsers?.find((u) => u.id === currentUserId)?.gameNick
+                        const isMine = Boolean(
+                          spotSignup && (
+                            spotSignup.userId === currentUserId ||
+                            (currentUserNick && spotSignup.gameNick?.trim().toLowerCase() === currentUserNick.trim().toLowerCase())
+                          )
+                        )
+                        const canToggle = spotSignup && (isLeader || isMine)
 
                         return (
                           <div
@@ -618,7 +686,7 @@ export function EventDetailDialog({
                             className={`rounded-xl border transition-all p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                               spotSignup
                                 ? isMine
-                                  ? `${colorPreset.cardBorder} ${colorPreset.cardBg} shadow-xs ring-1 ring-primary/20`
+                                  ? "border-cyan-500/50 dark:border-cyan-500/50 bg-cyan-500/10 dark:bg-cyan-950/30 border-l-[3.5px] border-l-cyan-500 shadow-xs ring-1 ring-cyan-500/25"
                                   : "border-border/70 bg-card/60"
                                 : `border-dashed border-border/80 hover:${colorPreset.cardBorder} bg-muted/10`
                             }`}
@@ -631,10 +699,14 @@ export function EventDetailDialog({
                               />
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-heading font-bold text-sm leading-tight">
+                                  <span className={`font-heading text-sm leading-tight ${isMine ? "font-extrabold text-cyan-600 dark:text-cyan-400" : "font-bold"}`}>
                                     {spot.name}
                                   </span>
-                                  {spotSignup ? (
+                                  {isMine ? (
+                                    <Badge className="bg-cyan-600 hover:bg-cyan-600 text-white dark:bg-cyan-500 dark:text-slate-950 font-bold text-[9px] h-4.5 px-1.5 shadow-xs">
+                                      Twój spot
+                                    </Badge>
+                                  ) : spotSignup ? (
                                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-medium">
                                       Zajęty
                                     </Badge>
@@ -652,15 +724,15 @@ export function EventDetailDialog({
 
                             {/* Center / Details: Occupant info if signed up */}
                             {spotSignup ? (
-                              <div className="flex flex-1 items-center justify-between sm:justify-center gap-3 bg-background/70 border px-3 py-1.5 rounded-lg text-xs">
+                              <div className={`flex flex-1 items-center justify-between sm:justify-center gap-3 border px-3 py-1.5 rounded-lg text-xs ${isMine ? "bg-cyan-500/10 border-cyan-500/30" : "bg-background/70"}`}>
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <span className="font-semibold truncate">
+                                  <span className={`truncate ${isMine ? "text-cyan-700 dark:text-cyan-300 font-bold" : "font-semibold"}`}>
                                     {spotSignup.gameNick}
                                   </span>
                                   {spotSignup.role ? (
                                     <Badge
                                       variant="outline"
-                                      className="text-[10px] font-medium px-1.5 py-0"
+                                      className={`text-[10px] font-medium px-1.5 py-0 ${isMine ? "border-cyan-500/40 text-cyan-700 dark:text-cyan-300" : ""}`}
                                     >
                                       {spotSignup.role}
                                     </Badge>
@@ -695,9 +767,15 @@ export function EventDetailDialog({
                                     size="sm"
                                     className={`h-8 text-xs font-semibold ${colorPreset.badgeClass} shadow-xs px-4`}
                                     onClick={() => handleSpotSignUp(spot.id)}
-                                    disabled={pending || Boolean(mySignup)}
+                                    disabled={pending || Boolean(mySignup) || isLocked}
                                   >
-                                    {Boolean(mySignup) ? "Zajęto inny spot" : "Zajmij spot"}
+                                    {isFeeLocked
+                                      ? "Zablokowane (składka)"
+                                      : isDateLocked
+                                      ? "Zapisy zablokowane"
+                                      : Boolean(mySignup)
+                                      ? "Zajęto inny spot"
+                                      : "Zajmij spot"}
                                   </Button>
 
                                   {isLeader ? (
@@ -734,7 +812,7 @@ export function EventDetailDialog({
                       {mySignup ? (
                         <div className="flex items-center gap-2">
                           <Badge className="bg-emerald-600 text-xs px-2.5 py-1">
-                            Twój spot: {mySignup.spot}
+                            Twój spot: {positionLabel(mySignup.spot)}
                           </Badge>
                           <Button
                             size="xs"

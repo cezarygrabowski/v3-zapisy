@@ -12,7 +12,7 @@ import {
 import { MAP_ZONES, POSITIONS, positionLabel, slotLabel, type PositionId, type SlotId } from "@/lib/constants"
 import type { KillLogItem, RosterMember, RunSyncState } from "@/lib/queries"
 import type { EventDetails } from "@/lib/calendar-types"
-import { formatDatePl } from "@/lib/dates"
+import { formatDatePl, isV3SignupDateLocked } from "@/lib/dates"
 import { V3Map } from "@/components/v3-map"
 import { RunTimers } from "@/components/run-timers"
 import { EventDetailDialog } from "@/components/calendar/event-detail-dialog"
@@ -30,6 +30,7 @@ export function PanelV3View({
   queenCounts,
   users,
   currentUserId,
+  currentUserNick,
   isLeader,
 }: {
   slot: { id: SlotId; label: string; status: "trwa" | "nastepny" | "skonczony" }
@@ -40,6 +41,7 @@ export function PanelV3View({
   queenCounts: { userId: string; queens: number }[]
   users: { id: string; gameNick: string }[]
   currentUserId: string
+  currentUserNick?: string
   isLeader: boolean
 }) {
   const [pending, startTransition] = useTransition()
@@ -83,8 +85,26 @@ export function PanelV3View({
     party,
   }
 
-  // Calendar event my-signup
-  const myEventSignup = v3CalendarEvent?.signups.find((s) => s.userId === currentUserId)
+  // Calendar event my-signup & resolved position
+  const myEventSignup = v3CalendarEvent?.signups.find(
+    (s) =>
+      s.userId === currentUserId ||
+      (currentUserNick && s.gameNick.trim().toLowerCase() === currentUserNick.trim().toLowerCase())
+  )
+
+  // Identify which position is occupied by current user (via calendar signup or slot roster)
+  const myPosition =
+    myEventSignup?.spot ??
+    effectiveRoster.find(
+      (m) =>
+        (m.userId && m.userId === currentUserId) ||
+        (m.gameNick && currentUserNick && m.gameNick.trim().toLowerCase() === currentUserNick.trim().toLowerCase())
+    )?.position ??
+    null
+
+  const isDateLocked = Boolean(v3CalendarEvent && isV3SignupDateLocked(v3CalendarEvent.date))
+  const isFeeLocked = Boolean(v3CalendarEvent?.currentUserFeeLock?.isLocked)
+  const isV3Locked = isDateLocked || isFeeLocked
 
   function handleSpotSignUp(spotId: string) {
     if (!v3CalendarEvent) return
@@ -232,7 +252,7 @@ export function PanelV3View({
               <span className="text-muted-foreground">Twój status:</span>
               {myEventSignup ? (
                 <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                  ✓ Zapisany na spot {myEventSignup.spot || "bez miejscówki"} ({myEventSignup.role || "PvM"})
+                  ✓ Zapisany na spot {positionLabel(myEventSignup.spot) || "bez miejscówki"} ({myEventSignup.role || "PvM"})
                 </span>
               ) : (
                 <span className="text-muted-foreground italic">Nie jesteś jeszcze zapisany na to wydarzenie</span>
@@ -280,13 +300,13 @@ export function PanelV3View({
 
       {/* Main split: Spots roster & Timers / Kill tracker */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left column: 6 Positions Roster */}
+        {/* Left column: Positions Roster */}
         <div className="lg:col-span-6 flex flex-col gap-4">
           <Card>
             <CardHeader className="pb-3 bg-muted/20">
               <CardTitle className="text-base font-bold flex items-center justify-between">
                 <span>
-                  Obsada miejscówek ({effectiveRoster.filter((r) => r.userId).length} / 6)
+                  Obsada miejscówek ({effectiveRoster.filter((r) => r.userId).length} / {POSITIONS.length})
                 </span>
                 <span className="text-xs font-mono font-normal text-muted-foreground">
                   {v3CalendarEvent ? `${v3CalendarEvent.startTime}–${v3CalendarEvent.endTime || ""}` : `Slot ${slot.id}`}
@@ -301,20 +321,20 @@ export function PanelV3View({
             <CardContent className="pt-4 flex flex-col gap-2">
               {POSITIONS.map((pos) => {
                 const member = byPosition.get(pos.id)
-                const isOccupied = Boolean(member?.userId)
-                const isMine = member?.userId === currentUserId
+                const isOccupied = Boolean(member?.userId || member?.gameNick)
+                const isMine = pos.id === myPosition
                 const zoneInfo = MAP_ZONES.find((z) => z.position === pos.id)
                 const spotSignup = v3CalendarEvent?.signups.find((s) => s.spot === pos.id)
 
                 return (
                   <div
                     key={pos.id}
-                    className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition-colors ${
-                      isOccupied
-                        ? isMine
-                          ? "bg-primary/10 border-primary/40 font-semibold"
-                          : "bg-card border-border/80"
-                        : "border-dashed border-border/70 bg-muted/10 text-muted-foreground"
+                    className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition-all ${
+                      isMine
+                        ? "bg-cyan-500/10 dark:bg-cyan-950/35 border-cyan-500/50 dark:border-cyan-500/50 border-l-[3.5px] border-l-cyan-500 dark:border-l-cyan-400 shadow-xs ring-1 ring-cyan-500/25"
+                        : isOccupied
+                          ? "bg-card border-border/80"
+                          : "border-dashed border-border/70 bg-muted/10 text-muted-foreground"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -322,7 +342,7 @@ export function PanelV3View({
                         className="h-3 w-3 rounded-full shrink-0 shadow-xs border border-black/20"
                         style={{ backgroundColor: zoneInfo?.color || "#888" }}
                       />
-                      <span className="font-heading font-bold text-sm min-w-[75px] truncate">
+                      <span className={`font-heading text-sm min-w-[75px] truncate ${isMine ? "font-extrabold text-cyan-600 dark:text-cyan-400" : "font-bold"}`}>
                         {pos.label}
                       </span>
                       <span className="text-[11px] text-muted-foreground truncate hidden sm:inline">
@@ -333,17 +353,22 @@ export function PanelV3View({
                     <div className="flex items-center gap-2 shrink-0">
                       {isOccupied ? (
                         <div className="flex items-center gap-1.5">
-                          <span className={`truncate ${isMine ? "text-primary font-bold" : "text-foreground font-medium"}`}>
+                          <span className={`truncate ${isMine ? "text-cyan-700 dark:text-cyan-300 font-bold" : "text-foreground font-medium"}`}>
                             {member?.gameNick}
                           </span>
                           {spotSignup?.role ? (
-                            <Badge variant="outline" className="text-[9px] h-4 px-1">
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] h-4 px-1 ${
+                                isMine ? "border-cyan-500/40 text-cyan-700 dark:text-cyan-300 bg-cyan-500/10" : ""
+                              }`}
+                            >
                               {spotSignup.role}
                             </Badge>
                           ) : null}
                           {isMine ? (
-                            <Badge className="bg-primary text-primary-foreground text-[9px] h-4 px-1">
-                              Ty
+                            <Badge className="bg-cyan-600 hover:bg-cyan-600 text-white dark:bg-cyan-500 dark:text-slate-950 font-bold text-[9px] h-4.5 px-1.5 shadow-xs">
+                              Twój spot
                             </Badge>
                           ) : null}
 
@@ -362,15 +387,26 @@ export function PanelV3View({
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] italic text-muted-foreground">Wolny spot</span>
                           {v3CalendarEvent && !myEventSignup ? (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              className="text-xs h-6 px-1.5 text-purple-600 dark:text-purple-400 font-semibold hover:bg-purple-500/10"
-                              disabled={pending}
-                              onClick={() => handleSpotSignUp(pos.id)}
-                            >
-                              + Zajmij
-                            </Button>
+                            isFeeLocked ? (
+                              <span
+                                className="text-[10px] text-destructive font-medium cursor-help"
+                                title={v3CalendarEvent.currentUserFeeLock?.reason ?? "Nieuregulowana składka"}
+                              >
+                                ⚠️ Zaległa składka
+                              </span>
+                            ) : isDateLocked ? (
+                              <span className="text-[10px] text-amber-500 font-medium">🔒 Zablokowany</span>
+                            ) : (
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                className="text-xs h-6 px-1.5 text-purple-600 dark:text-purple-400 font-semibold hover:bg-purple-500/10"
+                                disabled={pending}
+                                onClick={() => handleSpotSignUp(pos.id)}
+                              >
+                                + Zajmij
+                              </Button>
+                            )
                           ) : null}
                         </div>
                       )}
@@ -392,6 +428,7 @@ export function PanelV3View({
                   position: member.position,
                   gameNick: member.gameNick,
                 }))}
+                myPosition={myPosition as PositionId | null}
               />
             </CardContent>
           </Card>

@@ -213,6 +213,7 @@ const WHEN_R1_KORYTARZ_EMPTY: Record<PositionId, string[]> = {
   R1_KORYTARZ: [],
   PRAWO: [],
   PRAWO_KORYTARZ: [],
+  R2_R3_KORYTARZ: [],
 }
 
 const ZONE_LABEL_ANCHORS: Partial<
@@ -224,6 +225,7 @@ const ZONE_LABEL_ANCHORS: Partial<
   R1_KORYTARZ: { beside: "w1", dx: 78, dy: 0 },
   PRAWO_KORYTARZ: { beside: "w4", dx: -78, dy: 0 },
   PRAWO: { rooms: ["br3", "br4", "br5", "br6"] },
+  R2_R3_KORYTARZ: { rooms: ["c2", "c3", "c4", "bl1"] },
 }
 
 export function zoneLabelAnchor(position: PositionId): { x: number; y: number } | null {
@@ -245,22 +247,33 @@ export function zoneLabelAnchor(position: PositionId): { x: number; y: number } 
 }
 
 export function layoutForOccupied(occupiedPositions: Set<PositionId>): Record<string, PositionId> {
-  if (occupiedPositions.has("R1_KORYTARZ") || occupiedPositions.size === 0) {
-    return ZONE_6
-  }
-
   const layout: Record<string, PositionId> = {}
   for (const [id, position] of Object.entries(ZONE_6)) {
-    if (position !== "R1_KORYTARZ") layout[id] = position
+    layout[id] = position
   }
-  for (const [position, ids] of Object.entries(WHEN_R1_KORYTARZ_EMPTY) as [
-    PositionId,
-    string[],
-  ][]) {
-    for (const id of ids) {
-      layout[id] = position
+
+  if (!occupiedPositions.has("R1_KORYTARZ") && occupiedPositions.size > 0) {
+    for (const [position, ids] of Object.entries(WHEN_R1_KORYTARZ_EMPTY) as [
+      PositionId,
+      string[],
+    ][]) {
+      for (const id of ids) {
+        layout[id] = position
+      }
     }
   }
+
+  // When R2 - R3 corridor is occupied, it takes rooms 32, 31, 30, 29, 28, 26, 20
+  if (occupiedPositions.has("R2_R3_KORYTARZ")) {
+    layout["c1"] = "R2_R3_KORYTARZ" // 32
+    layout["c2"] = "R2_R3_KORYTARZ" // 31
+    layout["c3"] = "R2_R3_KORYTARZ" // 30
+    layout["c4"] = "R2_R3_KORYTARZ" // 29
+    layout["bl1"] = "R2_R3_KORYTARZ" // 28
+    layout["bl2"] = "R2_R3_KORYTARZ" // 26
+    layout["bl3"] = "R2_R3_KORYTARZ" // 20
+  }
+
   return layout
 }
 
@@ -269,6 +282,7 @@ export const ZONE_COLORS: Record<PositionId, string> = {
   R1: "#F4D03F",
   R2: "#C48A55",
   R3: "#9BB6BA",
+  R2_R3_KORYTARZ: "#06B6D4",
   PRAWO: "#8B5A2B",
   PRAWO_KORYTARZ: "#F5B6C8",
 }

@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { rescheduleGuildEvent } from "@/lib/actions/calendar"
 import {
   calculateDurationHours,
+  computeEventEffectiveStatus,
   EVENT_TYPE_METADATA,
   getEventColorPreset,
   type GuildEventListItem,
@@ -19,8 +20,10 @@ import {
   weekStartInWarsaw,
   weekStartForDate,
   isIsoDate,
+  isV3SignupDateLocked,
 } from "@/lib/dates"
-import { Check, Link2 } from "lucide-react"
+import { positionLabel } from "@/lib/constants"
+import { ArrowRight, Check, Link2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -124,6 +127,30 @@ export function GuildCalendar({
     if (selectedType !== "all" && e.type !== selectedType) return false
     return true
   })
+
+  // Active events where the current user is signed up and the event is currently in progress
+  const myActiveEvents = events.filter((e) => {
+    if (!e.mySignup) return false
+    const effectiveStatus = computeEventEffectiveStatus(
+      e.status,
+      e.date,
+      e.startTime,
+      e.durationHours
+    )
+    return effectiveStatus === "active"
+  })
+
+  const handleNavigateToPanel = useCallback(
+    (eventType: GuildEventType) => {
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("v3_panel_active_tab", eventType === "v3" ? "v3" : "default")
+        } catch {}
+      }
+      router.push("/panel")
+    },
+    [router]
+  )
 
   // Group events by date (YYYY-MM-DD)
   const eventsByDate = new Map<string, GuildEventListItem[]>()
@@ -452,6 +479,101 @@ export function GuildCalendar({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Live In-Progress Event Notification Banner */}
+      {myActiveEvents.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          {myActiveEvents.map((actEvent) => {
+            const meta = EVENT_TYPE_METADATA[actEvent.type]
+            const spotName = actEvent.mySignup?.spot ? positionLabel(actEvent.mySignup.spot) : null
+            const roleName = actEvent.mySignup?.role
+
+            return (
+              <div
+                key={actEvent.id}
+                className="relative overflow-hidden rounded-2xl border border-cyan-500/35 bg-gradient-to-r from-cyan-500/15 via-sky-500/10 to-teal-500/10 dark:from-cyan-950/50 dark:via-sky-950/40 dark:to-teal-950/30 p-4 sm:p-5 shadow-lg shadow-cyan-500/5 transition-all"
+              >
+                {/* Cyan glow accent strip on left */}
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-cyan-400 via-teal-400 to-cyan-500" />
+
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5 pl-1 min-w-0">
+                    {/* Pulsing live radar icon */}
+                    <div className="relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 ring-1 ring-cyan-500/40 shadow-xs">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant="outline"
+                          className="border-cyan-500/40 bg-cyan-500/15 text-cyan-800 dark:text-cyan-200 text-[10px] font-bold uppercase tracking-wider gap-1.5 px-2 py-0.5"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                          Trwa teraz (LIVE)
+                        </Badge>
+
+                        <Badge variant="secondary" className="text-[11px] gap-1 bg-background/80 backdrop-blur-xs">
+                          <span>{meta.icon}</span>
+                          <span>{meta.label}</span>
+                        </Badge>
+
+                        {spotName ? (
+                          <Badge className="bg-cyan-600 dark:bg-cyan-500 text-white dark:text-zinc-950 text-[11px] font-bold px-2 shadow-xs">
+                            Twój spot: {spotName} {roleName ? `(${roleName})` : ""}
+                          </Badge>
+                        ) : roleName ? (
+                          <Badge className="bg-cyan-600 dark:bg-cyan-500 text-white dark:text-zinc-950 text-[11px] font-bold px-2 shadow-xs">
+                            Twoja rola: {roleName}
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      <div className="flex items-baseline gap-2 flex-wrap mt-0.5">
+                        <h3 className="font-heading font-bold text-base sm:text-lg text-foreground truncate">
+                          {actEvent.title}
+                        </h3>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          (godz. <strong className="font-mono text-foreground">{actEvent.startTime}</strong>
+                          {actEvent.endTime ? ` – ${actEvent.endTime}` : ""})
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        Bierzesz aktywny udział w tym wydarzeniu. Kliknij poniżej, aby przejść prosto do panelu walki i timerów.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 shrink-0 self-end md:self-center pl-1 sm:pl-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-9 border-cyan-500/30 hover:bg-cyan-500/10 text-cyan-800 dark:text-cyan-200 cursor-pointer"
+                      onClick={() => handleSelectEvent(actEvent.id)}
+                    >
+                      Szczegóły
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      className="text-xs h-9 font-semibold gap-2 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-700 hover:to-teal-700 text-white shadow-md shadow-cyan-600/20 dark:from-cyan-500 dark:to-teal-500 dark:text-zinc-950 dark:hover:from-cyan-400 dark:hover:to-teal-400 cursor-pointer"
+                      onClick={() => handleNavigateToPanel(actEvent.type)}
+                    >
+                      <span>Przejdź do panelu</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
         <div>
@@ -837,21 +959,33 @@ export function GuildCalendar({
                                       LIVE
                                     </Badge>
                                   ) : (
-                                    <span className="text-[10px] shrink-0 opacity-80">{meta.icon}</span>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {evt.type === "v3" && isV3SignupDateLocked(evt.date) ? (
+                                        <span className="text-[10px]" title="Zapisy zablokowane (otwarcie 2 dni przed)">🔒</span>
+                                      ) : null}
+                                      <span className="text-[10px] opacity-80">{meta.icon}</span>
+                                    </div>
                                   )}
                                 </div>
 
-                                <span className={`truncate text-xs leading-snug group-hover:underline block ${isActive ? "text-white font-semibold" : colorPreset.titleText}`}>
+                                <span className={`truncate text-xs leading-snug block font-semibold ${isActive ? "text-white" : colorPreset.titleText}`}>
                                   {evt.title}
                                 </span>
 
                                 {evt.mySignup ? (
-                                  <div className="mt-0.5 flex items-center">
+                                  <div className="mt-1 flex items-center min-w-0">
                                     <span
-                                      className="inline-flex items-center justify-center h-3.5 px-1 rounded bg-emerald-500 text-white font-bold text-[9px] shadow-2xs"
-                                      title={evt.mySignup.spot ? `Bierzesz udział: ${evt.mySignup.spot}` : "Bierzesz udział"}
+                                      className={`inline-flex items-center gap-1 max-w-full truncate px-1.5 py-0.5 rounded text-[9.5px] font-semibold tracking-tight shadow-2xs ${
+                                        isActive
+                                          ? "bg-emerald-500/25 text-emerald-200 border border-emerald-400/40"
+                                          : "bg-primary/10 text-primary border border-primary/20"
+                                      }`}
+                                      title={evt.mySignup.spot ? `Bierzesz udział: ${positionLabel(evt.mySignup.spot)}` : "Bierzesz udział"}
                                     >
-                                      ✓ Zapisany{evt.mySignup.spot ? ` (${evt.mySignup.spot})` : ""}
+                                      <span className="shrink-0 text-[9px] font-bold">✓</span>
+                                      <span className="truncate">
+                                        {evt.mySignup.spot ? positionLabel(evt.mySignup.spot) : "Zapisany"}
+                                      </span>
                                     </span>
                                   </div>
                                 ) : null}
@@ -860,7 +994,7 @@ export function GuildCalendar({
                               {heightPx > 45 ? (
                                 <div className={`flex items-center justify-between text-[10px] mt-auto pt-1 border-t ${isActive ? "border-white/15 text-emerald-200" : "border-current/10 " + colorPreset.subText}`}>
                                   <span className="truncate">
-                                    {evt.mySignup?.spot ? `Spot: ${evt.mySignup.spot}` : meta.label}
+                                    {meta.label}
                                   </span>
                                   <span className="font-medium shrink-0 ml-1">{evt.uniqueUsersCount} os.</span>
                                 </div>
@@ -1011,7 +1145,9 @@ export function GuildCalendar({
                               {isActive ? (
                                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
                               ) : (
-                                <span className="text-[10px] shrink-0 opacity-80">{meta.icon}</span>
+                                <span className="text-[10px] shrink-0 opacity-80">
+                                  {evt.type === "v3" && isV3SignupDateLocked(evt.date) ? "🔒" : meta.icon}
+                                </span>
                               )}
                               <span className={`truncate ${isActive ? "text-emerald-500 font-semibold" : colorPreset.titleText + " group-hover:underline"}`}>
                                 {evt.title}
@@ -1021,7 +1157,7 @@ export function GuildCalendar({
                               <span>{evt.startTime}</span>
                               {evt.mySignup ? (
                                 <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[9px]">
-                                  {evt.mySignup.spot || "Zapisany"}
+                                  {evt.mySignup.spot ? positionLabel(evt.mySignup.spot) : "Zapisany"}
                                 </span>
                               ) : (
                                 <span>{evt.uniqueUsersCount} os.</span>
@@ -1068,9 +1204,17 @@ export function GuildCalendar({
                             <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                               {meta.icon} {meta.label}
                             </Badge>
+                            {evt.type === "v3" && isV3SignupDateLocked(evt.date) ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10 gap-0.5"
+                              >
+                                🔒 Zapisy zablokowane
+                              </Badge>
+                            ) : null}
                             {evt.mySignup ? (
                               <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0 font-medium">
-                                ✓ Bierzesz udział {evt.mySignup.spot ? `(${evt.mySignup.spot})` : ""}
+                                ✓ Bierzesz udział {evt.mySignup.spot ? `(${positionLabel(evt.mySignup.spot)})` : ""}
                               </Badge>
                             ) : null}
                           </div>

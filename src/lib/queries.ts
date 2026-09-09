@@ -296,6 +296,7 @@ export async function listStats(fromDate: string | null): Promise<StatsRow[]> {
           R1: 0,
           R2: 0,
           R3: 0,
+          R2_R3_KORYTARZ: 0,
           PRAWO: 0,
           R1_KORYTARZ: 0,
           PRAWO_KORYTARZ: 0,

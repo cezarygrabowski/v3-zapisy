@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { createUser, setLeader, setPlaystyle, setUserPassword } from "@/lib/actions/admin"
+import { startImpersonation } from "@/lib/actions/impersonation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -37,7 +39,14 @@ type Row = {
   isLeader: boolean
 }
 
-export function AdminUsers({ users }: { users: Row[] }) {
+export function AdminUsers({
+  users,
+  currentUserId,
+}: {
+  users: Row[]
+  currentUserId?: string
+}) {
+  const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [createOpen, setCreateOpen] = useState(false)
   const [passwordUser, setPasswordUser] = useState<Row | null>(null)
@@ -49,6 +58,19 @@ export function AdminUsers({ users }: { users: Row[] }) {
       const result = await action()
       if (!result.ok) toast.error(result.error)
       else toast.success(result.message ?? "Zapisano")
+    })
+  }
+
+  function handleImpersonate(targetUserId: string) {
+    startTransition(async () => {
+      const res = await startImpersonation(targetUserId)
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+      router.push("/panel")
+      router.refresh()
     })
   }
 
@@ -113,9 +135,24 @@ export function AdminUsers({ users }: { users: Row[] }) {
                 />
               </TableCell>
               <TableCell className="text-right">
-                <Button size="sm" variant="outline" onClick={() => setPasswordUser(user)}>
-                  Hasło
-                </Button>
+                <div className="flex items-center justify-end gap-1.5">
+                  {user.id !== currentUserId ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-8 gap-1 border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer"
+                      onClick={() => handleImpersonate(user.id)}
+                      disabled={pending}
+                      title={`Wciel się w gracza ${user.gameNick}`}
+                    >
+                      <span>🎭</span>
+                      <span>Wciel się</span>
+                    </Button>
+                  ) : null}
+                  <Button size="sm" variant="outline" className="h-8 text-xs cursor-pointer" onClick={() => setPasswordUser(user)}>
+                    Hasło
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}

@@ -4,6 +4,7 @@ import { slotLabel } from "@/lib/constants"
 import { relevantSlot, todayInWarsaw } from "@/lib/dates"
 import { getSlotRoster, listKillStats, listKillsForDate, listRunSyncs, listUsers } from "@/lib/queries"
 import { requireUser } from "@/lib/session"
+import { checkUserFeeLock } from "@/lib/settings"
 import {
   ensureDefaultTimerCategories,
   listTimerCategoriesWithTimers,
@@ -19,7 +20,7 @@ export default async function PanelPage() {
   // Ensure default categories exist
   await ensureDefaultTimerCategories(user.id)
 
-  const [roster, v3Kills, syncs, categories, killStats, users, v3CalendarEvent] = await Promise.all([
+  const [roster, v3Kills, syncs, categories, killStats, users, rawV3Event, feeLock] = await Promise.all([
     getSlotRoster(date, slot.id),
     listKillsForDate(date),
     listRunSyncs(),
@@ -27,7 +28,12 @@ export default async function PanelPage() {
     listKillStats(null),
     listUsers(),
     getRelevantV3CalendarEvent(),
+    checkUserFeeLock(user.id),
   ])
+
+  const v3CalendarEvent = rawV3Event
+    ? { ...rawV3Event, currentUserFeeLock: feeLock }
+    : null
 
   return (
     <PanelHub
@@ -43,6 +49,7 @@ export default async function PanelPage() {
       }))}
       users={users.map((u) => ({ id: u.id, gameNick: u.gameNick }))}
       currentUserId={user.id}
+      currentUserNick={user.gameNick}
       isLeader={user.isLeader}
     />
   )

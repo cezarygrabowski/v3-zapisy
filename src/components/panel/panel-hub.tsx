@@ -27,6 +27,7 @@ export function PanelHub({
   queenCounts,
   users,
   currentUserId,
+  currentUserNick,
   isLeader,
 }: {
   slot: { id: SlotId; label: string; status: "trwa" | "nastepny" | "skonczony" }
@@ -38,6 +39,7 @@ export function PanelHub({
   queenCounts: { userId: string; queens: number }[]
   users: { id: string; gameNick: string }[]
   currentUserId: string
+  currentUserNick?: string
   isLeader: boolean
 }) {
   const router = useRouter()
@@ -392,6 +394,7 @@ export function PanelHub({
           queenCounts={queenCounts}
           users={users}
           currentUserId={currentUserId}
+          currentUserNick={currentUserNick}
           isLeader={isLeader}
         />
       ) : activeTab === "default" ? (

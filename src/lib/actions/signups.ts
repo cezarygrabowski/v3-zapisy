@@ -10,7 +10,7 @@ import {
   type PositionId,
   type SlotId,
 } from "@/lib/constants"
-import { isIsoDate, slotHasStarted } from "@/lib/dates"
+import { formatDatePl, getV3SignupOpenDate, isIsoDate, isV3SignupDateLocked, slotHasStarted } from "@/lib/dates"
 import { getDb, isUniqueViolation } from "@/lib/db"
 import { signups, users } from "@/lib/db/schema"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
@@ -44,6 +44,21 @@ export async function signUp(input: {
     date: string
     slot: SlotId
     position: PositionId
+  }
+
+  if (isV3SignupDateLocked(date)) {
+    return fail(
+      `Zapisy na ten event V3 ruszają na 2 dni przed wydarzeniem (od ${formatDatePl(getV3SignupOpenDate(date))}).`
+    )
+  }
+
+  const { checkUserFeeLock } = await import("@/lib/settings")
+  const feeLock = await checkUserFeeLock(user.id)
+  if (feeLock.isLocked) {
+    return fail(
+      feeLock.reason ??
+        `Nie możesz zapisać się na V3: masz nieuregulowaną składkę za poprzedni tydzień (${feeLock.overdueKk} kk). Ureguluj ją w zakładce Składki.`
+    )
   }
 
   if (!isPlaystyle(user.playstyle ?? "")) {

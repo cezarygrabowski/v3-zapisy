@@ -15,6 +15,8 @@ function revalidateFees() {
   revalidatePath("/", "layout")
   revalidatePath("/skladki")
   revalidatePath("/statystyki")
+  revalidatePath("/kalendarz")
+  revalidatePath("/panel")
 }
 
 async function offerAmountFor(userId: string, amountKk: number): Promise<number | null> {

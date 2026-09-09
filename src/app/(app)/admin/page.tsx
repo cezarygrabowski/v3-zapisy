@@ -1,12 +1,17 @@
+import { AdminFeeSettings } from "@/components/admin-fee-settings"
 import { AdminUsers } from "@/components/admin-users"
 import { listUsers } from "@/lib/queries"
 import { requireLeader } from "@/lib/session"
+import { getFeeSettlementDays } from "@/lib/settings"
 
 export const dynamic = "force-dynamic"
 
 export default async function AdminPage() {
-  await requireLeader()
-  const users = await listUsers()
+  const leader = await requireLeader()
+  const [users, settlementDays] = await Promise.all([
+    listUsers(),
+    getFeeSettlementDays(),
+  ])
 
   return (
     <div className="flex flex-col gap-6">
@@ -17,7 +22,9 @@ export default async function AdminPage() {
           LEADER_DISCORD_IDS.
         </p>
       </div>
+      <AdminFeeSettings initialDays={settlementDays} />
       <AdminUsers
+        currentUserId={leader.id}
         users={users.map((user) => ({
           id: user.id,
           gameNick: user.gameNick,
