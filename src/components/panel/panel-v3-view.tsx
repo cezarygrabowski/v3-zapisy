@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { recordBaronKill, recordQueenKill, undoKill } from "@/lib/actions/run"
@@ -12,10 +12,12 @@ import {
 import { MAP_ZONES, POSITIONS, positionLabel, slotLabel, type PositionId, type SlotId } from "@/lib/constants"
 import type { KillLogItem, RosterMember, RunSyncState } from "@/lib/queries"
 import type { EventDetails } from "@/lib/calendar-types"
-import { formatDatePl, isV3SignupDateLocked } from "@/lib/dates"
+import { formatDatePl, getTimeUntilEvent, isV3SignupDateLocked } from "@/lib/dates"
 import { V3Map } from "@/components/v3-map"
 import { RunTimers } from "@/components/run-timers"
 import { EventDetailDialog } from "@/components/calendar/event-detail-dialog"
+import { BaronKillDialog } from "@/components/panel/baron-kill-dialog"
+import { SpotTransferDialog } from "@/components/calendar/spot-transfer-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -46,6 +48,12 @@ export function PanelV3View({
 }) {
   const [pending, startTransition] = useTransition()
   const [calendarModalOpen, setCalendarModalOpen] = useState(false)
+  const [baronModalOpen, setBaronModalOpen] = useState(false)
+  const [transferModal, setTransferModal] = useState<{
+    signupId: string
+    spot: string | null
+    ownerNick: string
+  } | null>(null)
   const [v3Playstyle, setV3Playstyle] = useState<"PvM" | "PvP">("PvM")
 
   // If there's an active/upcoming V3 calendar event with spots, use its spots as the roster
@@ -63,6 +71,16 @@ export function PanelV3View({
   const effectiveRoster = calendarSpotsRoster ?? roster
   const byPosition = new Map(effectiveRoster.map((m) => [m.position, m]))
   const lastQueen = kills.find((k) => k.kind === "queen")
+
+  const suggestedRosterUserIds = useMemo(() => {
+    return Array.from(
+      new Set(
+        effectiveRoster
+          .map((m) => m.userId)
+          .filter((id): id is string => Boolean(id))
+      )
+    )
+  }, [effectiveRoster])
 
   const occupied = effectiveRoster.filter((member) => member.userId)
   const people =
@@ -102,7 +120,13 @@ export function PanelV3View({
     )?.position ??
     null
 
-  const isDateLocked = Boolean(v3CalendarEvent && isV3SignupDateLocked(v3CalendarEvent.date))
+  const userPenalty = v3CalendarEvent?.currentUserPenalty
+  const normalAdvanceDays = v3CalendarEvent?.signupAdvanceDays ?? 2
+  const maxDaysAhead = userPenalty?.hasPenalty
+    ? (userPenalty.allowedAdvanceDays ?? 1)
+    : normalAdvanceDays
+  const signupOpenTime = (v3CalendarEvent as unknown as { signupOpenTime?: string })?.signupOpenTime ?? "09:00"
+  const isDateLocked = Boolean(v3CalendarEvent && isV3SignupDateLocked(v3CalendarEvent.date, new Date(), maxDaysAhead, signupOpenTime))
   const isFeeLocked = Boolean(v3CalendarEvent?.currentUserFeeLock?.isLocked)
   const isV3Locked = isDateLocked || isFeeLocked
 
@@ -123,6 +147,18 @@ export function PanelV3View({
   }
 
   function handleWithdrawSpot(signupId: string) {
+    if (v3CalendarEvent) {
+      const timeInfo = getTimeUntilEvent(v3CalendarEvent.date, v3CalendarEvent.startTime)
+      if (timeInfo.isLessThan2Hours && !timeInfo.hasStarted) {
+        if (
+          !confirm(
+            `⚠️ UWAGA: Do rozpoczęcia wydarzenia zostało tylko ${timeInfo.label} (< 2h)!\n\nZwolnienie spota w ostatniej chwili może skutkować żółtą kartką od administratora.\n\nZalecamy skorzystanie z opcji „Przekaż” (zastępstwo).\n\nCzy na pewno chcesz zwolnić ten spot?`
+          )
+        ) {
+          return
+        }
+      }
+    }
     startTransition(async () => {
       const res = await withdrawFromGuildEvent({ signupId })
       if (!res.ok) {
@@ -242,6 +278,15 @@ export function PanelV3View({
               {pending ? <Spinner data-icon="inline-start" /> : null}
               ⚡ Zbiłem Królową V3
             </Button>
+
+            <Button
+              size="sm"
+              className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs h-8 shadow-xs"
+              disabled={pending}
+              onClick={() => setBaronModalOpen(true)}
+            >
+              👑 Zbiłem Baronową V3
+            </Button>
           </div>
         </div>
 
@@ -345,6 +390,11 @@ export function PanelV3View({
                       <span className={`font-heading text-sm min-w-[75px] truncate ${isMine ? "font-extrabold text-cyan-600 dark:text-cyan-400" : "font-bold"}`}>
                         {pos.label}
                       </span>
+                      {pos.id === "R2_R3_KORYTARZ" ? (
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded shrink-0">
+                          najsłabszy • bez kokonów
+                        </span>
+                      ) : null}
                       <span className="text-[11px] text-muted-foreground truncate hidden sm:inline">
                         {zoneInfo?.note}
                       </span>
@@ -373,14 +423,32 @@ export function PanelV3View({
                           ) : null}
 
                           {v3CalendarEvent && (isMine || isLeader) && spotSignup ? (
-                            <button
-                              type="button"
-                              onClick={() => handleWithdrawSpot(spotSignup.signupId)}
-                              disabled={pending}
-                              className="text-[10px] text-muted-foreground hover:text-destructive underline ml-1"
-                            >
-                              Zwolnij
-                            </button>
+                            <div className="flex items-center gap-1 ml-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setTransferModal({
+                                    signupId: spotSignup.signupId,
+                                    spot: spotSignup.spot,
+                                    ownerNick: member?.gameNick || "",
+                                  })
+                                }
+                                disabled={pending}
+                                className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline"
+                                title="Przekaż miejscówkę innemu graczowi (zastępstwo)"
+                              >
+                                Przekaż
+                              </button>
+                              <span className="text-[10px] text-muted-foreground">•</span>
+                              <button
+                                type="button"
+                                onClick={() => handleWithdrawSpot(spotSignup.signupId)}
+                                disabled={pending}
+                                className="text-[10px] text-muted-foreground hover:text-destructive underline"
+                              >
+                                {isLeader && !isMine ? "Wywal" : "Zwolnij"}
+                              </button>
+                            </div>
                           ) : null}
                         </div>
                       ) : (
@@ -470,30 +538,45 @@ export function PanelV3View({
                     return (
                       <div
                         key={kill.id}
-                        className="flex items-center justify-between p-2 rounded-lg border bg-muted/10 text-xs"
+                        className="flex flex-col gap-1 p-2 rounded-lg border bg-muted/10 text-xs"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isQueen ? "bg-amber-500/20 text-amber-600 dark:text-amber-400" : "bg-purple-500/20 text-purple-600 dark:text-purple-400"}`}>
-                            {isQueen ? "🕷️ Królowa" : "👑 Baronówna"}
-                          </span>
-                          <span className="font-mono text-muted-foreground text-[11px]">
-                            {kill.killedAtLabel}
-                          </span>
-                          <span className="font-medium truncate">
-                            {kill.reporterNick}
-                          </span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                isQueen
+                                  ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                                  : "bg-purple-500/20 text-purple-600 dark:text-purple-400"
+                              }`}
+                            >
+                              {isQueen ? "🕷️ Królowa" : "👑 Baronówna"}
+                            </span>
+                            <span className="font-mono text-muted-foreground text-[11px]">
+                              {kill.killedAtLabel}
+                            </span>
+                            <span className="font-medium truncate">
+                              {kill.reporterNick}
+                            </span>
+                          </div>
+
+                          {canUndo ? (
+                            <button
+                              type="button"
+                              onClick={() => handleUndoKill(kill.id)}
+                              disabled={pending}
+                              className="text-[11px] text-muted-foreground hover:text-destructive hover:underline ml-2"
+                            >
+                              Cofnij
+                            </button>
+                          ) : null}
                         </div>
 
-                        {canUndo ? (
-                          <button
-                            type="button"
-                            onClick={() => handleUndoKill(kill.id)}
-                            disabled={pending}
-                            className="text-[11px] text-muted-foreground hover:text-destructive hover:underline ml-2"
-                          >
-                            Cofnij
-                          </button>
-                        ) : null}
+                        {!isQueen && kill.helperNicks && kill.helperNicks.length > 0 && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pl-1">
+                            <span className="font-semibold text-foreground/80">Skład:</span>
+                            <span className="truncate">{kill.helperNicks.join(", ")}</span>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -503,6 +586,16 @@ export function PanelV3View({
           </Card>
         </div>
       </div>
+
+      {/* Baron Kill Reporting Dialog */}
+      <BaronKillDialog
+        open={baronModalOpen}
+        onOpenChange={setBaronModalOpen}
+        users={users}
+        currentUserId={currentUserId}
+        currentUserNick={currentUserNick}
+        suggestedHelperIds={suggestedRosterUserIds}
+      />
 
       {/* Calendar Event Full Details Modal */}
       {v3CalendarEvent ? (
@@ -515,6 +608,20 @@ export function PanelV3View({
           allGuildUsers={users}
         />
       ) : null}
+
+      {transferModal && (
+        <SpotTransferDialog
+          open={transferModal !== null}
+          onOpenChange={(op) => {
+            if (!op) setTransferModal(null)
+          }}
+          signupId={transferModal.signupId}
+          currentSpot={transferModal.spot}
+          currentOwnerNick={transferModal.ownerNick}
+          allUsers={users}
+          existingParticipantUserIds={v3CalendarEvent?.signups.map((s) => s.userId)}
+        />
+      )}
     </div>
   )
 }

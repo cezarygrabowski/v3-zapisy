@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache"
 import { calculateDurationHours, type RecurrenceType } from "@/lib/calendar-types"
-import { addDays, formatDatePl, getV3SignupOpenDate, isIsoDate, isV3SignupDateLocked } from "@/lib/dates"
+import { addDays, formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isIsoDate, isV3SignupDateLocked } from "@/lib/dates"
 import { getDb } from "@/lib/db"
 import { getCurrentUser, requireUser } from "@/lib/session"
 import { and, eq } from "drizzle-orm"
-import { guildEventSignups, guildEvents, users } from "@/lib/db/schema"
+import { guildEventAuditLogs, guildEventSignups, guildEvents, users } from "@/lib/db/schema"
 import { hasV3Access } from "@/lib/permissions"
 import { findUserById } from "@/lib/db/users"
 
@@ -170,9 +170,28 @@ export async function signUpForGuildEvent(input: {
     }
 
     const isSelfSignup = !input.targetUserId || targetUserId === user.id
-    if ((isSelfSignup || !user.isLeader) && isV3SignupDateLocked(event.date)) {
+
+    // Determine configured advance days, opening time, and yellow card penalty limit
+    const { getSignupAdvanceDays, getSignupOpenTime } = await import("@/lib/settings")
+    let maxDaysAhead = await getSignupAdvanceDays()
+    const signupOpenTime = await getSignupOpenTime()
+
+    if (isSelfSignup || !user.isLeader) {
+      const { getActivePenaltyForUser } = await import("@/lib/actions/penalties")
+      const activePenalty = await getActivePenaltyForUser(targetUserId)
+      if (activePenalty) {
+        maxDaysAhead = activePenalty.allowedAdvanceDays
+        if (isV3SignupDateLocked(event.date, new Date(), maxDaysAhead, signupOpenTime)) {
+          return fail(
+            `Masz aktywną żółtą kartkę (poziom ${activePenalty.cardLevel}, kara do ${activePenalty.expiresAtPl}). Możesz zapisywać się maksymalnie na ${maxDaysAhead} ${maxDaysAhead === 1 ? "dzień" : "dni"} w przód (zapisy ruszają ${formatDatePl(getV3SignupOpenDate(event.date, maxDaysAhead))} o godz. ${signupOpenTime}). Powód kary: „${activePenalty.reason}”.`
+          )
+        }
+      }
+    }
+
+    if ((isSelfSignup || !user.isLeader) && isV3SignupDateLocked(event.date, new Date(), maxDaysAhead, signupOpenTime)) {
       return fail(
-        `Zapisy na ten event V3 ruszają na 2 dni przed wydarzeniem (od ${formatDatePl(getV3SignupOpenDate(event.date))}).`
+        `Zapisy na ten event V3 ruszają na ${maxDaysAhead} ${maxDaysAhead === 1 ? "dzień" : "dni"} przed wydarzeniem (od ${formatDatePl(getV3SignupOpenDate(event.date, maxDaysAhead))} o godz. ${signupOpenTime}).`
       )
     }
 
@@ -253,6 +272,24 @@ export async function signUpForGuildEvent(input: {
     attended: true,
   })
 
+  // Audit log: record signup or admin assignment
+  try {
+    const isSelfSignup = user.id === targetUserId
+    await db.insert(guildEventAuditLogs).values({
+      id: crypto.randomUUID(),
+      eventId: input.eventId,
+      action: isSelfSignup ? "signup" : "admin_assign",
+      actorId: user.id,
+      targetUserId: isSelfSignup ? null : targetUserId,
+      spot: input.spot || null,
+      role: userRole,
+      reason: null,
+      details: null,
+    })
+  } catch (err) {
+    console.error("Failed to write audit log in signUpForGuildEvent:", err)
+  }
+
   revalidatePath("/kalendarz")
   revalidatePath(`/kalendarz/wydarzenie/${input.eventId}`)
   revalidatePath("/panel")
@@ -263,6 +300,9 @@ export async function signUpForGuildEvent(input: {
 
 export async function withdrawFromGuildEvent(input: {
   signupId: string
+  reason?: string
+  giveYellowCard?: boolean
+  yellowCardReason?: string
 }): Promise<ActionResult> {
   const user = await requireUser()
   const db = await getDb()
@@ -272,6 +312,8 @@ export async function withdrawFromGuildEvent(input: {
       id: guildEventSignups.id,
       eventId: guildEventSignups.eventId,
       userId: guildEventSignups.userId,
+      spot: guildEventSignups.spot,
+      role: guildEventSignups.role,
     })
     .from(guildEventSignups)
     .where(eq(guildEventSignups.id, input.signupId))
@@ -282,7 +324,61 @@ export async function withdrawFromGuildEvent(input: {
     return fail("Możesz wypisać tylko siebie.")
   }
 
+  // Fetch event date/time to check 2-hour window
+  const [event] = await db
+    .select({
+      id: guildEvents.id,
+      date: guildEvents.date,
+      startTime: guildEvents.startTime,
+    })
+    .from(guildEvents)
+    .where(eq(guildEvents.id, signup.eventId))
+
+  const timeInfo = event ? getTimeUntilEvent(event.date, event.startTime) : null
+
   await db.delete(guildEventSignups).where(eq(guildEventSignups.id, input.signupId))
+
+  // If leader requested to issue a yellow card
+  if (user.isLeader && input.giveYellowCard && signup.userId !== user.id) {
+    try {
+      const { giveYellowCard } = await import("@/lib/actions/penalties")
+      await giveYellowCard({
+        userId: signup.userId,
+        reason:
+          input.yellowCardReason?.trim() ||
+          input.reason?.trim() ||
+          "Nieobecność / wycofanie ze slota przez administratora",
+        eventId: signup.eventId,
+      })
+    } catch (err) {
+      console.error("Failed to give yellow card during withdraw:", err)
+    }
+  }
+
+  // Audit log: record withdrawal (self or by admin with reason)
+  try {
+    const isSelfWithdraw = signup.userId === user.id
+    await db.insert(guildEventAuditLogs).values({
+      id: crypto.randomUUID(),
+      eventId: signup.eventId,
+      action: isSelfWithdraw ? "withdraw" : "admin_withdraw",
+      actorId: user.id,
+      targetUserId: isSelfWithdraw ? null : signup.userId,
+      spot: signup.spot || null,
+      role: signup.role || null,
+      reason: isSelfWithdraw ? null : input.reason?.trim() || null,
+      details: timeInfo
+        ? JSON.stringify({
+            isLessThan2Hours: timeInfo.isLessThan2Hours,
+            timeRemaining: timeInfo.label,
+            hasStarted: timeInfo.hasStarted,
+            issuedYellowCard: Boolean(user.isLeader && input.giveYellowCard),
+          })
+        : null,
+    })
+  } catch (err) {
+    console.error("Failed to write audit log in withdrawFromGuildEvent:", err)
+  }
 
   revalidatePath("/kalendarz")
   revalidatePath(`/kalendarz/wydarzenie/${signup.eventId}`)
@@ -290,6 +386,133 @@ export async function withdrawFromGuildEvent(input: {
   revalidatePath("/skladki")
   revalidatePath("/statystyki")
   return ok("Wypisano z wydarzenia.")
+}
+
+export async function transferSpotToUser(input: {
+  signupId: string
+  targetUserId: string
+}): Promise<ActionResult> {
+  const user = await requireUser()
+  const db = await getDb()
+
+  const [signup] = await db
+    .select({
+      id: guildEventSignups.id,
+      eventId: guildEventSignups.eventId,
+      userId: guildEventSignups.userId,
+      spot: guildEventSignups.spot,
+      role: guildEventSignups.role,
+      hourIndex: guildEventSignups.hourIndex,
+    })
+    .from(guildEventSignups)
+    .where(eq(guildEventSignups.id, input.signupId))
+
+  if (!signup) return fail("Nie znaleziono zapisu.")
+
+  if (!user.isLeader && signup.userId !== user.id) {
+    return fail("Możesz przekazać tylko swoją własną miejscówkę.")
+  }
+
+  if (signup.userId === input.targetUserId) {
+    return fail("Nie możesz przekazać spota samemu sobie.")
+  }
+
+  const [targetUser] = await db
+    .select({
+      id: users.id,
+      gameNick: users.gameNick,
+      playstyle: users.playstyle,
+      roles: users.roles,
+      isVerified: users.isVerified,
+      isLeader: users.isLeader,
+    })
+    .from(users)
+    .where(eq(users.id, input.targetUserId))
+
+  if (!targetUser) return fail("Nie znaleziono wybranego gracza.")
+
+  const [event] = await db
+    .select({
+      id: guildEvents.id,
+      title: guildEvents.title,
+      type: guildEvents.type,
+      date: guildEvents.date,
+      startTime: guildEvents.startTime,
+    })
+    .from(guildEvents)
+    .where(eq(guildEvents.id, signup.eventId))
+
+  if (!event) return fail("Nie znaleziono wydarzenia.")
+
+  if (event.type === "v3") {
+    if (!hasV3Access(targetUser)) {
+      return fail("Wybrany gracz nie posiada roli V3.")
+    }
+
+    const { checkUserFeeLock } = await import("@/lib/settings")
+    const feeLock = await checkUserFeeLock(targetUser.id)
+    if (feeLock.isLocked) {
+      return fail(
+        `Wybrany gracz ma zablokowane zapisy z powodu zaległej składki (${feeLock.overdueKk} kk).`
+      )
+    }
+  }
+
+  const [existingSignup] = await db
+    .select({ id: guildEventSignups.id })
+    .from(guildEventSignups)
+    .where(
+      and(
+        eq(guildEventSignups.eventId, signup.eventId),
+        eq(guildEventSignups.userId, input.targetUserId)
+      )
+    )
+
+  if (existingSignup) {
+    return fail("Wybrany gracz jest już zapisany na to wydarzenie.")
+  }
+
+  let newRole = signup.role
+  if (event.type === "v3") {
+    newRole = targetUser.playstyle === "pvp" ? "PvP" : "PvM"
+  }
+
+  await db
+    .update(guildEventSignups)
+    .set({
+      userId: input.targetUserId,
+      role: newRole,
+    })
+    .where(eq(guildEventSignups.id, input.signupId))
+
+  const timeInfo = getTimeUntilEvent(event.date, event.startTime)
+
+  try {
+    await db.insert(guildEventAuditLogs).values({
+      id: crypto.randomUUID(),
+      eventId: signup.eventId,
+      action: "spot_transfer",
+      actorId: user.id,
+      targetUserId: input.targetUserId,
+      spot: signup.spot,
+      role: newRole,
+      reason: null,
+      details: JSON.stringify({
+        previousUserId: signup.userId,
+        timeRemaining: timeInfo.label,
+        isLessThan2Hours: timeInfo.isLessThan2Hours,
+      }),
+    })
+  } catch (err) {
+    console.error("Failed to write audit log in transferSpotToUser:", err)
+  }
+
+  revalidatePath("/kalendarz")
+  revalidatePath(`/kalendarz/wydarzenie/${signup.eventId}`)
+  revalidatePath("/panel")
+  revalidatePath("/skladki")
+  revalidatePath("/statystyki")
+  return ok(`Przekazano miejscówkę ${signup.spot ? `(${signup.spot})` : ""} graczowi ${targetUser.gameNick}.`)
 }
 
 export async function toggleGuildEventAttendance(signupId: string): Promise<ActionResult> {
@@ -438,6 +661,26 @@ export async function rescheduleGuildEvent(input: {
     })
     .where(eq(guildEvents.id, input.eventId))
 
+  try {
+    await db.insert(guildEventAuditLogs).values({
+      id: crypto.randomUUID(),
+      eventId: input.eventId,
+      action: "reschedule",
+      actorId: user.id,
+      targetUserId: null,
+      spot: null,
+      role: null,
+      reason: null,
+      details: JSON.stringify({
+        date: input.date,
+        startTime: input.startTime,
+        endTime: input.endTime,
+      }),
+    })
+  } catch (err) {
+    console.error("Failed to write audit log in rescheduleGuildEvent:", err)
+  }
+
   revalidatePath("/kalendarz")
   revalidatePath(`/kalendarz/wydarzenie/${input.eventId}`)
   revalidatePath("/")
@@ -562,16 +805,76 @@ export async function getGuildEventModalDetails(eventId: string) {
       }
 
       if (user) {
+        let currentUserFeeLock
         try {
           const { checkUserFeeLock } = await import("@/lib/settings")
-          const currentUserFeeLock = await checkUserFeeLock(user.id)
-          return { ...event, currentUserFeeLock, restrictedAccess: false }
+          currentUserFeeLock = await checkUserFeeLock(user.id)
         } catch (err) {
           console.error("Error evaluating checkUserFeeLock in getGuildEventModalDetails:", err)
-          return { ...event, restrictedAccess: false }
+        }
+
+        let currentUserPenalty = null
+        try {
+          const { getActivePenaltyForUser } = await import("@/lib/actions/penalties")
+          const pen = await getActivePenaltyForUser(user.id)
+          if (pen) {
+            currentUserPenalty = {
+              hasPenalty: true,
+              cardLevel: pen.cardLevel,
+              durationDays: pen.durationDays,
+              allowedAdvanceDays: pen.allowedAdvanceDays,
+              expiresAt: pen.expiresAt,
+              expiresAtPl: pen.expiresAtPl,
+              reason: pen.reason,
+            }
+          }
+        } catch (err) {
+          console.error("Error evaluating getActivePenaltyForUser in getGuildEventModalDetails:", err)
+        }
+
+        let signupAdvanceDays = 2
+        let signupOpenTime = "09:00"
+        try {
+          const { getSignupAdvanceDays, getSignupOpenTime } = await import("@/lib/settings")
+          signupAdvanceDays = await getSignupAdvanceDays()
+          signupOpenTime = await getSignupOpenTime()
+        } catch (err) {
+          console.error("Error fetching signup settings in getGuildEventModalDetails:", err)
+        }
+
+        let auditLogs
+        if (user.isLeader) {
+          try {
+            const { listGuildEventAuditLogs } = await import("@/lib/calendar-queries")
+            auditLogs = await listGuildEventAuditLogs(eventId)
+          } catch (err) {
+            console.error("Error fetching auditLogs in getGuildEventModalDetails:", err)
+          }
+        }
+
+        return {
+          ...event,
+          currentUserFeeLock,
+          currentUserPenalty,
+          signupAdvanceDays,
+          signupOpenTime,
+          restrictedAccess: false,
+          auditLogs,
         }
       }
     }
+
+    // For non-V3 events, also attach auditLogs if user is leader
+    if (user?.isLeader) {
+      try {
+        const { listGuildEventAuditLogs } = await import("@/lib/calendar-queries")
+        const auditLogs = await listGuildEventAuditLogs(eventId)
+        return { ...event, auditLogs }
+      } catch (err) {
+        console.error("Error fetching auditLogs in getGuildEventModalDetails:", err)
+      }
+    }
+
     return event
   } catch (err) {
     console.error("Error in getGuildEventModalDetails:", err)

@@ -1,4 +1,4 @@
-import { ROLE_V3 } from "@/lib/db/schema"
+import { ROLE_V3 } from "@/lib/constants"
 
 export type UserPermissionLike = {
   isLeader?: boolean

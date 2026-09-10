@@ -23,7 +23,10 @@ export default async function PanelPage() {
   // Ensure default categories exist
   await ensureDefaultTimerCategories(user.id)
 
-  const [roster, v3Kills, syncs, categories, killStats, users, rawV3Event, feeLock] = await Promise.all([
+  const { getSignupAdvanceDays, getSignupOpenTime } = await import("@/lib/settings")
+  const { getActivePenaltyForUser } = await import("@/lib/actions/penalties")
+
+  const [roster, v3Kills, syncs, categories, killStats, users, rawV3Event, feeLock, signupAdvanceDays, signupOpenTime, activePenalty] = await Promise.all([
     hasV3 ? getSlotRoster(date, slot.id) : Promise.resolve([]),
     hasV3 ? listKillsForDate(date) : Promise.resolve([]),
     hasV3 ? listRunSyncs() : Promise.resolve([]),
@@ -32,10 +35,29 @@ export default async function PanelPage() {
     listUsers(),
     hasV3 ? getRelevantV3CalendarEvent() : Promise.resolve(null),
     checkUserFeeLock(user.id),
+    getSignupAdvanceDays(),
+    getSignupOpenTime(),
+    getActivePenaltyForUser(user.id),
   ])
 
   const v3CalendarEvent = (hasV3 && rawV3Event)
-    ? { ...rawV3Event, currentUserFeeLock: feeLock }
+    ? {
+        ...rawV3Event,
+        currentUserFeeLock: feeLock,
+        currentUserPenalty: activePenalty
+          ? {
+              hasPenalty: true,
+              cardLevel: activePenalty.cardLevel,
+              durationDays: activePenalty.durationDays,
+              allowedAdvanceDays: activePenalty.allowedAdvanceDays,
+              expiresAt: activePenalty.expiresAt,
+              expiresAtPl: activePenalty.expiresAtPl,
+              reason: activePenalty.reason,
+            }
+          : null,
+        signupAdvanceDays,
+        signupOpenTime,
+      }
     : null
 
   return (

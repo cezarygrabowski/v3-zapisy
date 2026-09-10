@@ -204,19 +204,63 @@ export function formatDatePl(isoDate: string): string {
 }
 
 /**
- * Checks if signing up for a V3 event is locked based on its date.
- * Allowed: today, tomorrow, and the day after tomorrow (max 2 days forward).
- * Locked: 3 days or more in advance (date > today + 2 days).
+ * Checks if signing up for a V3 event is locked based on its date and configurable opening hour.
+ * Allowed: today, tomorrow, and optionally the day after tomorrow (maxDaysAhead forward).
+ * On the opening date (eventDate - maxDaysAhead), signups open at openTime (default 09:00 Warsaw time).
  */
-export function isV3SignupDateLocked(eventDate: string, now = new Date()): boolean {
+export function isV3SignupDateLocked(
+  eventDate: string,
+  now = new Date(),
+  maxDaysAhead = 2,
+  openTime = "09:00"
+): boolean {
   const today = todayInWarsaw(now)
-  const maxAllowedDate = addDays(today, 2)
-  return eventDate > maxAllowedDate
+  const openDate = addDays(eventDate, -maxDaysAhead)
+  if (today < openDate) return true
+  if (today > openDate) return false
+
+  // today === openDate: check whether open time has arrived in Warsaw
+  const [openH, openM] = (openTime || "09:00").split(":").map(Number)
+  const openMinutes = (openH || 0) * 60 + (openM || 0)
+  const currentMinutes = warsawMinutes(now)
+  return currentMinutes < openMinutes
 }
 
 /**
- * Returns the ISO date string when signups open for a V3 event (2 days before the event).
+ * Returns the ISO date string when signups open for a V3 event (e.g. 2 days before or 1 day before).
  */
-export function getV3SignupOpenDate(eventDate: string): string {
-  return addDays(eventDate, -2)
+export function getV3SignupOpenDate(eventDate: string, maxDaysAhead = 2): string {
+  return addDays(eventDate, -maxDaysAhead)
+}
+
+/**
+ * Calculates time remaining until an event starts.
+ * Returns difference in minutes, whether it is strictly less than 2 hours (120 min), and a human-readable label.
+ */
+export function getTimeUntilEvent(eventDate: string, startTime: string, now = new Date()): {
+  diffMinutes: number
+  isLessThan2Hours: boolean
+  hasStarted: boolean
+  label: string
+} {
+  const hms = startTime.length === 5 ? `${startTime}:00` : startTime
+  const eventStart = warsawWallToDate(eventDate, hms)
+  if (!eventStart) {
+    return { diffMinutes: 9999, isLessThan2Hours: false, hasStarted: false, label: "—" }
+  }
+
+  const diffMs = eventStart.getTime() - now.getTime()
+  const diffMinutes = Math.round(diffMs / (60 * 1000))
+  const hasStarted = diffMinutes <= 0
+  const isLessThan2Hours = diffMinutes < 120
+
+  if (hasStarted) {
+    return { diffMinutes, isLessThan2Hours: true, hasStarted: true, label: "Wydarzenie już się rozpoczęło" }
+  }
+
+  const hours = Math.floor(diffMinutes / 60)
+  const minutes = diffMinutes % 60
+  const label = hours > 0 ? `${hours}h ${minutes}m przed startem` : `${minutes}m przed startem`
+
+  return { diffMinutes, isLessThan2Hours, hasStarted, label }
 }

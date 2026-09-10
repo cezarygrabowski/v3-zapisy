@@ -171,12 +171,12 @@ export function PanelHub({
         })
       }
 
-      // 3. Królówka (okno 40 min - 2 h od zbicia minus 5 min)
+      // 3. Królówka (okno 1 h - 2 h od zbicia minus 5 min)
       const lastQueen = v3Kills.find((k) => k.kind === "queen")
       if (lastQueen) {
         const syncedAt = new Date(lastQueen.killedAt).getTime()
         const appearedAt = syncedAt - 5 * 60 * 1000
-        const earlyAt = appearedAt + 40 * 60 * 1000
+        const earlyAt = appearedAt + 60 * 60 * 1000
         const lateAt = appearedAt + 2 * 60 * 60 * 1000
 
         if (now < earlyAt) {

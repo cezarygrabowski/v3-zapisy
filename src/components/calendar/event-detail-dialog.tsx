@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
-import { Check, Link2 } from "lucide-react"
+import { Check, Link2, Users } from "lucide-react"
 import { toast } from "sonner"
 import {
   deleteGuildEvent,
@@ -23,8 +23,10 @@ import {
   type EventDetails,
   type GuildEventType,
 } from "@/lib/calendar-types"
-import { formatDatePl, getV3SignupOpenDate, isV3SignupDateLocked } from "@/lib/dates"
+import { formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isV3SignupDateLocked } from "@/lib/dates"
 import { positionLabel } from "@/lib/constants"
+import { SpotTransferDialog } from "@/components/calendar/spot-transfer-dialog"
+import { GiveYellowCardDialog } from "@/components/calendar/give-yellow-card-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -167,14 +169,87 @@ export function EventDetailDialog({
     })
   }
 
-  function handleWithdraw(signupId: string) {
+  // State for admin withdrawing someone with reason
+  const [adminWithdrawTarget, setAdminWithdrawTarget] = useState<{
+    signupId: string
+    userId: string
+    userName: string
+    spot?: string | null
+  } | null>(null)
+  const [adminWithdrawReason, setAdminWithdrawReason] = useState("")
+  const [adminGiveYellowCard, setAdminGiveYellowCard] = useState(false)
+  const [adminYellowCardReason, setAdminYellowCardReason] = useState("")
+
+  // State for transferring spot to another player
+  const [transferModal, setTransferModal] = useState<{
+    signupId: string
+    spot: string | null
+    ownerNick: string
+  } | null>(null)
+
+  // State for admin directly giving yellow card from event
+  const [giveYellowCardTarget, setGiveYellowCardTarget] = useState<{
+    userId: string
+    userNick: string
+  } | null>(null)
+
+  function handleWithdrawClick(signup: { signupId: string; userId: string; gameNick?: string; spot?: string | null }) {
+    if (isLeader && signup.userId !== currentUserId) {
+      setAdminWithdrawReason("")
+      setAdminGiveYellowCard(false)
+      setAdminYellowCardReason("")
+      setAdminWithdrawTarget({
+        signupId: signup.signupId,
+        userId: signup.userId,
+        userName: signup.gameNick || "gracza",
+        spot: signup.spot,
+      })
+      return
+    }
+
+    // Direct withdrawal for self - check 2h rule
+    if (event) {
+      const timeInfo = getTimeUntilEvent(event.date, event.startTime)
+      if (timeInfo.isLessThan2Hours && !timeInfo.hasStarted) {
+        if (
+          !confirm(
+            `⚠️ UWAGA: Do rozpoczęcia wydarzenia zostało tylko ${timeInfo.label} (< 2h)!\n\nZwolnienie spota w ostatniej chwili może skutkować żółtą kartką od administratora.\n\nZalecamy skorzystanie z opcji „Przekaż miejscówkę” (zastępstwo).\n\nCzy na pewno chcesz zwolnić swój spot?`
+          )
+        ) {
+          return
+        }
+      }
+    }
+
     startTransition(async () => {
-      const res = await withdrawFromGuildEvent({ signupId })
+      const res = await withdrawFromGuildEvent({ signupId: signup.signupId })
       if (!res.ok) {
         toast.error(res.error)
         return
       }
       toast.success(res.message)
+      refreshDetails()
+    })
+  }
+
+  function handleConfirmAdminWithdraw() {
+    if (!adminWithdrawTarget) return
+    startTransition(async () => {
+      const res = await withdrawFromGuildEvent({
+        signupId: adminWithdrawTarget.signupId,
+        reason: adminWithdrawReason.trim() || undefined,
+        giveYellowCard: adminGiveYellowCard,
+        yellowCardReason: adminYellowCardReason.trim() || adminWithdrawReason.trim() || undefined,
+      })
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+      setAdminWithdrawTarget(null)
+      setAdminWithdrawReason("")
+      setAdminGiveYellowCard(false)
+      setAdminYellowCardReason("")
       refreshDetails()
     })
   }
@@ -292,8 +367,14 @@ export function EventDetailDialog({
   const mySignup = event?.signups.find((s) => s.userId === currentUserId)
   const canManage = Boolean(event && (isLeader || event.createdById === currentUserId))
   const isV3 = event?.type === "v3"
-  const isDateLocked = Boolean(event && isV3 && isV3SignupDateLocked(event.date))
-  const unlockDatePl = event && isV3 ? formatDatePl(getV3SignupOpenDate(event.date)) : ""
+  const userPenalty = event?.currentUserPenalty
+  const normalAdvanceDays = event?.signupAdvanceDays ?? 2
+  const maxDaysAhead = userPenalty?.hasPenalty
+    ? (userPenalty.allowedAdvanceDays ?? 1)
+    : normalAdvanceDays
+  const signupOpenTime = (event as unknown as { signupOpenTime?: string })?.signupOpenTime ?? "09:00"
+  const isDateLocked = Boolean(event && isV3 && isV3SignupDateLocked(event.date, new Date(), maxDaysAhead, signupOpenTime))
+  const unlockDatePl = event && isV3 ? formatDatePl(getV3SignupOpenDate(event.date, maxDaysAhead)) : ""
   const feeLock = isV3 ? event?.currentUserFeeLock : undefined
   const isFeeLocked = Boolean(feeLock?.isLocked)
   const isLocked = isDateLocked || isFeeLocked
@@ -625,20 +706,64 @@ export function EventDetailDialog({
                     {/* User signup status banner if signed up */}
                     {mySignup ? (
                       <div
-                        className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${colorPreset.cardBg} ${colorPreset.cardBorder}`}
+                        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border ${colorPreset.cardBg} ${colorPreset.cardBorder}`}
                       >
                         <Badge className={`${colorPreset.badgeClass} text-xs px-2.5 py-1 font-medium`}>
                           Twój spot: {positionLabel(mySignup.spot)} {mySignup.role ? `(${mySignup.role})` : ""}
                         </Badge>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          className="text-xs text-destructive hover:text-destructive h-7"
-                          onClick={() => handleWithdraw(mySignup.signupId)}
-                          disabled={pending}
-                        >
-                          Zwolnij spot
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="xs"
+                            variant="secondary"
+                            className="text-xs h-7 gap-1 font-medium"
+                            onClick={() =>
+                              setTransferModal({
+                                signupId: mySignup.signupId,
+                                spot: mySignup.spot,
+                                ownerNick: mySignup.gameNick,
+                              })
+                            }
+                          >
+                            <Users className="size-3" />
+                            Przekaż spot (Zastępstwo)
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="text-xs text-destructive hover:text-destructive h-7"
+                            onClick={() =>
+                              handleWithdrawClick({
+                                signupId: mySignup.signupId,
+                                userId: currentUserId,
+                                spot: mySignup.spot,
+                              })
+                            }
+                            disabled={pending}
+                          >
+                            Zwolnij spot
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Active yellow card penalty banner */}
+                    {userPenalty?.hasPenalty ? (
+                      <div className="flex items-start gap-3 p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs shadow-xs">
+                        <span className="text-lg shrink-0 select-none">🟨</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-sm flex items-center gap-2">
+                            <span>Aktywna żółta kartka (Poziom {userPenalty.cardLevel})</span>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/30 font-bold"
+                            >
+                              Kara do {userPenalty.expiresAtPl}
+                            </Badge>
+                          </span>
+                          <span className="text-[11px] opacity-90 leading-relaxed">
+                            Z powodu aktywnej żółtej kartki możesz zapisywać się na wydarzenia V3 <strong>tylko na {userPenalty.allowedAdvanceDays ?? 1} {userPenalty.allowedAdvanceDays === 1 ? "dzień" : "dni"} w przód</strong> (zamiast standardowych {normalAdvanceDays} dni). Powód: <em>„{userPenalty.reason}”</em>.
+                          </span>
+                        </div>
                       </div>
                     ) : null}
 
@@ -669,11 +794,13 @@ export function EventDetailDialog({
                         <span className="text-base shrink-0 select-none">🔒</span>
                         <div className="flex flex-col gap-0.5">
                           <span className="font-semibold text-sm">
-                            Zapisy na ten event V3 ruszają na 2 dni przed wydarzeniem
+                            Zapisy na ten event V3 ruszają na {maxDaysAhead} {maxDaysAhead === 1 ? "dzień" : "dni"} przed wydarzeniem (od godz. {signupOpenTime})
                           </span>
                           <span className="text-[11px] opacity-90 leading-relaxed">
-                            Można wpisywać się na wydarzenia w bieżącym dniu, jutrzejszym oraz pojutrzejszym (maksymalnie 2 dni do przodu). Zapisy dla graczy zostaną otwarte:{" "}
-                            <strong className="font-bold underline underline-offset-2">{unlockDatePl}</strong>.
+                            {userPenalty?.hasPenalty
+                              ? `Z powodu nałożonej żółtej kartki Twoje zapisy otwierają się dopiero ${maxDaysAhead} ${maxDaysAhead === 1 ? "dzień" : "dni"} przed wydarzeniem: `
+                              : `Zapisy na wydarzenia są otwarte z wyprzedzeniem ${normalAdvanceDays} ${normalAdvanceDays === 1 ? "dnia" : "dni"}. Zapisy dla graczy zostaną otwarte: `}
+                            <strong className="font-bold underline underline-offset-2">{unlockDatePl} o godz. {signupOpenTime}</strong>.
                             {isLeader ? " Jako lider możesz w razie potrzeby ręcznie zapisać gracza opcją '+ Wpisz'." : ""}
                           </span>
                         </div>
@@ -732,6 +859,11 @@ export function EventDetailDialog({
                                     </Badge>
                                   )}
                                 </div>
+                                {spot.desc ? (
+                                  <div className={`text-[11px] truncate ${spot.id === "R2_R3_KORYTARZ" ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"}`}>
+                                    {spot.desc}
+                                  </div>
+                                ) : null}
                               </div>
                             </div>
 
@@ -763,17 +895,46 @@ export function EventDetailDialog({
                             {/* Right: Actions */}
                             <div className="flex items-center gap-2 justify-end shrink-0">
                               {spotSignup ? (
-                                isLeader || isMine ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleWithdraw(spotSignup.signupId)}
-                                    disabled={pending}
-                                    className="h-8 text-xs text-muted-foreground hover:text-destructive"
-                                  >
-                                    Zwolnij
-                                  </Button>
-                                ) : null
+                                <div className="flex items-center gap-1.5">
+                                  {(isMine || isLeader) && (
+                                    <Button
+                                      size="xs"
+                                      variant="secondary"
+                                      onClick={() =>
+                                        setTransferModal({
+                                          signupId: spotSignup.signupId,
+                                          spot: spotSignup.spot,
+                                          ownerNick: spotSignup.gameNick,
+                                        })
+                                      }
+                                      disabled={pending}
+                                      className="h-8 text-xs font-medium gap-1"
+                                      title="Przekaż miejscówkę innemu graczowi (zastępstwo)"
+                                    >
+                                      <Users className="size-3" />
+                                      Przekaż
+                                    </Button>
+                                  )}
+
+                                  {isLeader || isMine ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        handleWithdrawClick({
+                                          signupId: spotSignup.signupId,
+                                          userId: spotSignup.userId,
+                                          gameNick: spotSignup.gameNick,
+                                          spot: spotSignup.spot,
+                                        })
+                                      }
+                                      disabled={pending}
+                                      className="h-8 text-xs text-muted-foreground hover:text-destructive"
+                                    >
+                                      {isLeader && !isMine ? "Wywal" : "Zwolnij"}
+                                    </Button>
+                                  ) : null}
+                                </div>
                               ) : (
                                 <>
                                   <Button
@@ -831,7 +992,7 @@ export function EventDetailDialog({
                             size="xs"
                             variant="outline"
                             className="text-xs text-destructive hover:text-destructive h-7"
-                            onClick={() => handleWithdraw(mySignup.signupId)}
+                            onClick={() => handleWithdrawClick({ signupId: mySignup.signupId, userId: currentUserId, spot: mySignup.spot })}
                             disabled={pending}
                           >
                             Zwolnij spot
@@ -881,9 +1042,14 @@ export function EventDetailDialog({
                                   {isLeader || isMine ? (
                                     <button
                                       type="button"
-                                      onClick={() => handleWithdraw(spotSignup.signupId)}
+                                      onClick={() => handleWithdrawClick({
+                                        signupId: spotSignup.signupId,
+                                        userId: spotSignup.userId,
+                                        gameNick: spotSignup.gameNick,
+                                        spot: spotSignup.spot,
+                                      })}
                                       disabled={pending}
-                                      className="text-muted-foreground hover:text-destructive hover:underline font-medium"
+                                      className="text-muted-foreground hover:text-destructive hover:underline font-medium cursor-pointer"
                                     >
                                       Zwolnij
                                     </button>
@@ -956,8 +1122,13 @@ export function EventDetailDialog({
                                   <Button
                                     size="xs"
                                     variant="ghost"
-                                    className="text-xs text-muted-foreground hover:text-destructive h-6 px-2"
-                                    onClick={() => handleWithdraw(p.signupId)}
+                                    className="text-xs text-muted-foreground hover:text-destructive h-6 px-2 cursor-pointer"
+                                    onClick={() => handleWithdrawClick({
+                                      signupId: p.signupId,
+                                      userId: p.userId,
+                                      gameNick: p.gameNick,
+                                      spot: p.spot,
+                                    })}
                                   >
                                     Wypisz
                                   </Button>
@@ -980,7 +1151,7 @@ export function EventDetailDialog({
                               variant="outline"
                               size="sm"
                               className="text-xs text-destructive hover:text-destructive"
-                              onClick={() => handleWithdraw(mySignup.signupId)}
+                              onClick={() => handleWithdrawClick({ signupId: mySignup.signupId, userId: currentUserId, spot: mySignup.spot })}
                             >
                               Wypisz się
                             </Button>
@@ -1007,9 +1178,320 @@ export function EventDetailDialog({
                     </div>
                   </div>
                 )}
+
+                {/* 4. AUDIT LOG SECTION (Visible ONLY to Leaders/Admins) */}
+                {isLeader ? (
+                  <div className="mt-4 pt-4 border-t flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">📜</span>
+                        <span className="font-heading font-bold text-sm">Historia zmian i audyt</span>
+                        <Badge variant="outline" className="text-[10px] font-mono border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10">
+                          Tylko Admin
+                        </Badge>
+                      </div>
+                      {event.auditLogs && event.auditLogs.length > 0 ? (
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {event.auditLogs.length} {event.auditLogs.length === 1 ? "wpis" : "wpisy/ów"}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {!event.auditLogs || event.auditLogs.length === 0 ? (
+                      <div className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground bg-muted/10">
+                        Brak zarejestrowanych operacji w historii tego wydarzenia.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-1">
+                        {event.auditLogs.map((log) => {
+                          const dateObj = new Date(log.createdAt)
+                          const timeStr = dateObj.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                          const dateStr = dateObj.toLocaleDateString("pl-PL", { day: "2-digit", month: "2-digit" })
+
+                          let detailsObj: { isLessThan2Hours?: boolean; timeRemaining?: string; issuedYellowCard?: boolean } | null = null
+                          if (log.details) {
+                            try {
+                              detailsObj = JSON.parse(log.details)
+                            } catch {}
+                          }
+
+                          let badgeVariant: "default" | "secondary" | "outline" = "outline"
+                          let badgeClass = ""
+                          let actionLabel = ""
+                          let content = null
+
+                          switch (log.action) {
+                            case "signup":
+                              badgeClass = "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                              actionLabel = "Zapis"
+                              content = (
+                                <span>
+                                  Gracz <strong className="text-foreground">{log.actorNick}</strong> zapisał się
+                                  {log.spot ? <> na spot <strong className="text-foreground">{positionLabel(log.spot)}</strong></> : ""}
+                                  {log.role ? ` (${log.role})` : ""}.
+                                </span>
+                              )
+                              break
+                            case "admin_assign":
+                              badgeClass = "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30"
+                              actionLabel = "Wpisanie (Admin)"
+                              content = (
+                                <span>
+                                  Admin <strong className="text-foreground">{log.actorNick}</strong> wpisał gracza{" "}
+                                  <strong className="text-foreground">{log.targetUserNick || "gracza"}</strong>
+                                  {log.spot ? <> na spot <strong className="text-foreground">{positionLabel(log.spot)}</strong></> : ""}.
+                                </span>
+                              )
+                              break
+                            case "withdraw":
+                              badgeClass = "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                              actionLabel = "Wypisanie"
+                              content = (
+                                <div className="flex flex-col gap-1">
+                                  <span>
+                                    Gracz <strong className="text-foreground">{log.actorNick}</strong> zwolnił swój spot
+                                    {log.spot ? <> <strong className="text-foreground">({positionLabel(log.spot)})</strong></> : ""}.
+                                  </span>
+                                  {detailsObj?.timeRemaining && (
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-[9px] h-4 px-1.5 font-medium ${
+                                          detailsObj.isLessThan2Hours
+                                            ? "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30 font-bold"
+                                            : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                                        }`}
+                                      >
+                                        {detailsObj.isLessThan2Hours ? "⚠️ < 2h do startu" : "✓ Bezpieczna rezygnacja (≥ 2h)"} ({detailsObj.timeRemaining})
+                                      </Badge>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                              break
+                            case "admin_withdraw":
+                              badgeClass = "bg-destructive/15 text-destructive border-destructive/30"
+                              actionLabel = "Wypisanie (Admin)"
+                              content = (
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span>
+                                      Admin <strong className="text-foreground">{log.actorNick}</strong> wypisał gracza{" "}
+                                      <strong className="text-foreground">{log.targetUserNick || "gracza"}</strong>
+                                      {log.spot ? <> ze spota <strong className="text-foreground">{positionLabel(log.spot)}</strong></> : ""}.
+                                    </span>
+                                    {detailsObj?.isLessThan2Hours !== undefined && (
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-[9px] h-4 px-1.5 ${
+                                          detailsObj.isLessThan2Hours
+                                            ? "bg-red-500/15 text-red-600 border-red-500/30 font-bold"
+                                            : "bg-muted text-muted-foreground border-border"
+                                        }`}
+                                      >
+                                        {detailsObj.isLessThan2Hours ? "⚠️ < 2h" : "≥ 2h"}
+                                      </Badge>
+                                    )}
+                                    {detailsObj?.issuedYellowCard && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[9px] h-4 px-1.5 bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-500/40 font-bold"
+                                      >
+                                        🟨 Żółta kartka
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {log.reason ? (
+                                    <div className="text-[11px] bg-background/80 border rounded p-1.5 text-foreground italic mt-0.5">
+                                      💬 Powód: <span className="font-normal not-italic">{log.reason}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[11px] text-muted-foreground italic">
+                                      (nie podano powodu)
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                              break
+                            case "spot_transfer":
+                              badgeClass = "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30"
+                              actionLabel = "Przekazanie spota"
+                              content = (
+                                <div className="flex flex-col gap-1">
+                                  <span>
+                                    Gracz <strong className="text-foreground">{log.actorNick}</strong> przekazał spot{" "}
+                                    {log.spot ? <strong className="text-foreground">({positionLabel(log.spot)})</strong> : ""}{" "}
+                                    graczowi <strong className="text-foreground">{log.targetUserNick || "innemu graczowi"}</strong>.
+                                  </span>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[9px] h-4 px-1.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30 font-medium"
+                                    >
+                                      ✓ Zastępstwo (slot obsadzony)
+                                    </Badge>
+                                    {detailsObj?.timeRemaining && (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        • {detailsObj.timeRemaining}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                              break
+                            case "yellow_card":
+                              badgeClass = "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40"
+                              actionLabel = "Żółta kartka"
+                              content = (
+                                <div className="flex flex-col gap-0.5">
+                                  <span>
+                                    Admin <strong className="text-foreground">{log.actorNick}</strong> nadał żółtą kartkę graczowi{" "}
+                                    <strong className="text-foreground">{log.targetUserNick || "graczowi"}</strong>.
+                                  </span>
+                                  {log.reason && (
+                                    <span className="text-[11px] italic text-muted-foreground">
+                                      💬 Powód: „{log.reason}”
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                              break
+                            case "reschedule":
+                              badgeClass = "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30"
+                              actionLabel = "Termin"
+                              content = (
+                                <span>
+                                  Admin <strong className="text-foreground">{log.actorNick}</strong> zmienił termin wydarzenia.
+                                </span>
+                              )
+                              break
+                            default:
+                              actionLabel = log.action
+                              content = <span>Zaktualizowano wydarzenie przez {log.actorNick}.</span>
+                          }
+
+                          return (
+                            <div
+                              key={log.id}
+                              className="rounded-lg border bg-muted/20 p-2.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 text-xs"
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <Badge variant={badgeVariant} className={`text-[10px] shrink-0 font-medium px-1.5 py-0 mt-0.5 ${badgeClass}`}>
+                                  {actionLabel}
+                                </Badge>
+                                <div className="text-xs leading-relaxed">
+                                  {content}
+                                </div>
+                              </div>
+                              <span className="font-mono text-[10.5px] text-muted-foreground shrink-0 self-end sm:self-start">
+                                {dateStr} {timeStr}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Withdraw Reason Dialog */}
+      <Dialog
+        open={adminWithdrawTarget !== null}
+        onOpenChange={(op) => {
+          if (!op) setAdminWithdrawTarget(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>⚠️</span>
+              <span>Wypisz gracza z wydarzenia</span>
+            </DialogTitle>
+            <DialogDescription>
+              Czy na pewno chcesz wypisać gracza{" "}
+              <strong className="text-foreground">{adminWithdrawTarget?.userName}</strong>
+              {adminWithdrawTarget?.spot ? (
+                <> ze spota <strong className="text-foreground">{positionLabel(adminWithdrawTarget.spot)}</strong></>
+              ) : ""}?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2 flex flex-col gap-3">
+            <Field>
+              <FieldLabel htmlFor="admin-withdraw-reason" className="text-xs font-semibold">
+                Powód wypisania (widoczny w audycie dla administracji)
+              </FieldLabel>
+              <Input
+                id="admin-withdraw-reason"
+                placeholder="np. brak obecności na DC, spóźnienie, zastępstwo..."
+                value={adminWithdrawReason}
+                onChange={(e) => setAdminWithdrawReason(e.target.value)}
+                className="text-xs"
+                autoFocus
+              />
+            </Field>
+
+            {/* Checkbox to give yellow card */}
+            <div className="flex flex-col gap-2 p-2.5 rounded-lg border bg-amber-500/10 border-amber-500/20 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer select-none font-semibold text-amber-800 dark:text-amber-300">
+                <Checkbox
+                  checked={adminGiveYellowCard}
+                  onCheckedChange={(c) => setAdminGiveYellowCard(Boolean(c))}
+                />
+                <span>🟨 Nadaj żółtą kartkę temu graczowi</span>
+              </label>
+
+              {adminGiveYellowCard && (
+                <div className="flex flex-col gap-1.5 pl-6 pt-1">
+                  <p className="text-[11px] text-muted-foreground">
+                    Kara ograniczy zapisy gracza do 1 dnia w przód (stopień zostanie obliczony automatycznie: 3, 7 lub 14 dni).
+                  </p>
+                  <Field>
+                    <FieldLabel htmlFor="admin-yellow-card-reason" className="text-[11px] font-medium">
+                      Powód żółtej kartki (jeśli inny niż powód wypisania)
+                    </FieldLabel>
+                    <Input
+                      id="admin-yellow-card-reason"
+                      placeholder="Uzasadnienie żółtej kartki..."
+                      value={adminYellowCardReason}
+                      onChange={(e) => setAdminYellowCardReason(e.target.value)}
+                      className="text-xs h-8"
+                    />
+                  </Field>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              Ten wpis wraz z podanym powodem zostanie trwale zapisany w dzienniku zdarzeń (audycie) wydarzenia.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAdminWithdrawTarget(null)}
+              disabled={pending}
+            >
+              Anuluj
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={pending}
+              onClick={handleConfirmAdminWithdraw}
+              className="cursor-pointer font-semibold"
+            >
+              {pending ? <Spinner data-icon="inline-start" /> : null}
+              Wypisz gracza
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1101,6 +1583,36 @@ export function EventDetailDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Spot Transfer Dialog */}
+      {transferModal && (
+        <SpotTransferDialog
+          open={transferModal !== null}
+          onOpenChange={(op) => {
+            if (!op) setTransferModal(null)
+          }}
+          signupId={transferModal.signupId}
+          currentSpot={transferModal.spot}
+          currentOwnerNick={transferModal.ownerNick}
+          allUsers={allGuildUsers}
+          existingParticipantUserIds={event?.signups.map((s) => s.userId)}
+          onTransferred={refreshDetails}
+        />
+      )}
+
+      {/* Give Yellow Card Dialog */}
+      {giveYellowCardTarget && (
+        <GiveYellowCardDialog
+          open={giveYellowCardTarget !== null}
+          onOpenChange={(op) => {
+            if (!op) setGiveYellowCardTarget(null)
+          }}
+          targetUserId={giveYellowCardTarget.userId}
+          targetUserNick={giveYellowCardTarget.userNick}
+          eventId={event?.id}
+          onCardIssued={refreshDetails}
+        />
+      )}
     </>
   )
 }

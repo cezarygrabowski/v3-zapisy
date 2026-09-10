@@ -9,7 +9,13 @@ import { createPasswordUser, findUserById } from "@/lib/db/users"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
 import { hashPassword, parseLogin, parsePassword } from "@/lib/password"
 import { requireLeader } from "@/lib/session"
-import { SETTING_KEY_FEE_SETTLEMENT_DAYS } from "@/lib/settings"
+import {
+  SETTING_KEY_FEE_SETTLEMENT_DAYS,
+  SETTING_KEY_SIGNUP_ADVANCE_DAYS,
+  SETTING_KEY_SIGNUP_OPEN_TIME,
+  SETTING_KEY_PENALTY_RULES,
+  type PenaltyRulesConfig,
+} from "@/lib/settings"
 
 export async function setLeader(userId: string, isLeader: boolean): Promise<ActionResult> {
   const actor = await requireLeader()
@@ -146,10 +152,194 @@ export async function setFeeSettlementDays(days: number): Promise<ActionResult> 
     })
 
   revalidatePath("/admin")
+  revalidatePath("/admin/konfiguracja")
   revalidatePath("/kalendarz")
   revalidatePath("/skladki")
   revalidatePath("/panel")
   return ok("Zapisano czas na uregulowanie składki.")
+}
+
+export async function setSignupAdvanceDays(days: number): Promise<ActionResult> {
+  const leader = await requireLeader()
+  if (!Number.isInteger(days) || days < 0 || days > 30) {
+    return fail("Liczba dni wyprzedzenia musi być liczbą całkowitą od 0 do 30.")
+  }
+
+  const db = await getDb()
+  await db
+    .insert(guildSettings)
+    .values({
+      key: SETTING_KEY_SIGNUP_ADVANCE_DAYS,
+      value: String(days),
+      updatedAt: new Date(),
+      updatedBy: leader.id,
+    })
+    .onConflictDoUpdate({
+      target: guildSettings.key,
+      set: {
+        value: String(days),
+        updatedAt: new Date(),
+        updatedBy: leader.id,
+      },
+    })
+
+  revalidatePath("/admin")
+  revalidatePath("/admin/konfiguracja")
+  revalidatePath("/kalendarz")
+  revalidatePath("/panel")
+  return ok(`Zapisano wyprzedzenie zapisów: ${days} ${days === 1 ? "dzień" : "dni"}.`)
+}
+
+export async function setSignupOpenTime(time: string): Promise<ActionResult> {
+  const leader = await requireLeader()
+  const trimmed = (time || "").trim()
+  if (!/^\d{2}:\d{2}$/.test(trimmed)) {
+    return fail("Godzina otwarcia zapisów musi być w formacie GG:MM (np. 09:00).")
+  }
+  const [h, m] = trimmed.split(":").map(Number)
+  if (h < 0 || h > 23 || m < 0 || m > 59) {
+    return fail("Nieprawidłowa godzina. Podaj wartość między 00:00 a 23:59.")
+  }
+
+  const db = await getDb()
+  await db
+    .insert(guildSettings)
+    .values({
+      key: SETTING_KEY_SIGNUP_OPEN_TIME,
+      value: trimmed,
+      updatedAt: new Date(),
+      updatedBy: leader.id,
+    })
+    .onConflictDoUpdate({
+      target: guildSettings.key,
+      set: {
+        value: trimmed,
+        updatedAt: new Date(),
+        updatedBy: leader.id,
+      },
+    })
+
+  revalidatePath("/admin")
+  revalidatePath("/admin/konfiguracja")
+  revalidatePath("/kalendarz")
+  revalidatePath("/panel")
+  return ok(`Zapisano godzinę otwarcia zapisów: ${trimmed}.`)
+}
+
+export async function setSignupAdvanceSettings({
+  advanceDays,
+  openTime,
+}: {
+  advanceDays: number
+  openTime: string
+}): Promise<ActionResult> {
+  const leader = await requireLeader()
+  if (!Number.isInteger(advanceDays) || advanceDays < 0 || advanceDays > 30) {
+    return fail("Liczba dni wyprzedzenia musi być liczbą całkowitą od 0 do 30.")
+  }
+  const trimmedTime = (openTime || "").trim()
+  if (!/^\d{2}:\d{2}$/.test(trimmedTime)) {
+    return fail("Godzina otwarcia zapisów musi być w formacie GG:MM (np. 09:00).")
+  }
+  const [h, m] = trimmedTime.split(":").map(Number)
+  if (h < 0 || h > 23 || m < 0 || m > 59) {
+    return fail("Nieprawidłowa godzina. Podaj wartość między 00:00 a 23:59.")
+  }
+
+  const db = await getDb()
+  await Promise.all([
+    db
+      .insert(guildSettings)
+      .values({
+        key: SETTING_KEY_SIGNUP_ADVANCE_DAYS,
+        value: String(advanceDays),
+        updatedAt: new Date(),
+        updatedBy: leader.id,
+      })
+      .onConflictDoUpdate({
+        target: guildSettings.key,
+        set: {
+          value: String(advanceDays),
+          updatedAt: new Date(),
+          updatedBy: leader.id,
+        },
+      }),
+    db
+      .insert(guildSettings)
+      .values({
+        key: SETTING_KEY_SIGNUP_OPEN_TIME,
+        value: trimmedTime,
+        updatedAt: new Date(),
+        updatedBy: leader.id,
+      })
+      .onConflictDoUpdate({
+        target: guildSettings.key,
+        set: {
+          value: trimmedTime,
+          updatedAt: new Date(),
+          updatedBy: leader.id,
+        },
+      }),
+  ])
+
+  revalidatePath("/admin")
+  revalidatePath("/admin/konfiguracja")
+  revalidatePath("/kalendarz")
+  revalidatePath("/panel")
+  return ok(
+    `Zapisano: wyprzedzenie ${advanceDays} ${advanceDays === 1 ? "dzień" : "dni"}, godzina otwarcia ${trimmedTime}.`
+  )
+}
+
+export async function setPenaltyRules(rules: PenaltyRulesConfig): Promise<ActionResult> {
+  const leader = await requireLeader()
+  if (
+    !rules ||
+    typeof rules.card1?.durationDays !== "number" ||
+    typeof rules.card2?.durationDays !== "number" ||
+    typeof rules.card3?.durationDays !== "number"
+  ) {
+    return fail("Nieprawidłowa konfiguracja kar.")
+  }
+
+  const validated: PenaltyRulesConfig = {
+    card1: {
+      durationDays: Math.max(1, Math.min(365, Math.round(rules.card1.durationDays))),
+      advanceDays: Math.max(0, Math.min(30, Math.round(rules.card1.advanceDays))),
+    },
+    card2: {
+      durationDays: Math.max(1, Math.min(365, Math.round(rules.card2.durationDays))),
+      advanceDays: Math.max(0, Math.min(30, Math.round(rules.card2.advanceDays))),
+    },
+    card3: {
+      durationDays: Math.max(1, Math.min(365, Math.round(rules.card3.durationDays))),
+      advanceDays: Math.max(0, Math.min(30, Math.round(rules.card3.advanceDays))),
+    },
+  }
+
+  const db = await getDb()
+  await db
+    .insert(guildSettings)
+    .values({
+      key: SETTING_KEY_PENALTY_RULES,
+      value: JSON.stringify(validated),
+      updatedAt: new Date(),
+      updatedBy: leader.id,
+    })
+    .onConflictDoUpdate({
+      target: guildSettings.key,
+      set: {
+        value: JSON.stringify(validated),
+        updatedAt: new Date(),
+        updatedBy: leader.id,
+      },
+    })
+
+  revalidatePath("/admin")
+  revalidatePath("/admin/konfiguracja")
+  revalidatePath("/kalendarz")
+  revalidatePath("/panel")
+  return ok("Zapisano reguły żółtych kartek.")
 }
 
 export async function setUserVerified(userId: string, isVerified: boolean): Promise<ActionResult> {

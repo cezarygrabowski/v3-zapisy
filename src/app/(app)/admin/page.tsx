@@ -1,28 +1,36 @@
-import { AdminFeeSettings } from "@/components/admin-fee-settings"
+import { AdminNav } from "@/components/admin-nav"
 import { AdminUsers } from "@/components/admin-users"
+import { AdminYellowCards } from "@/components/admin-yellow-cards"
 import { listUsers } from "@/lib/queries"
 import { requireLeader } from "@/lib/session"
-import { getFeeSettlementDays } from "@/lib/settings"
+import { listAllPenalties } from "@/lib/actions/penalties"
 
 export const dynamic = "force-dynamic"
 
 export default async function AdminPage() {
   const leader = await requireLeader()
-  const [users, settlementDays] = await Promise.all([
+
+  const [users, penalties] = await Promise.all([
     listUsers(),
-    getFeeSettlementDays(),
+    listAllPenalties(),
   ])
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="font-heading text-2xl font-semibold">Admin</h1>
+        <h1 className="font-heading text-2xl font-semibold">Admin — Zarządzanie</h1>
         <p className="text-sm text-muted-foreground">
-          Nadaj rolę admina, popraw typ postaci i zakładaj konta z loginem. Pierwsi admini biorą się też z
-          LEADER_DISCORD_IDS.
+          Zarządzaj członkami gildii: uprawnienia, weryfikacja kont, role i tagi oraz nadawanie żółtych kartek.
         </p>
       </div>
-      <AdminFeeSettings initialDays={settlementDays} />
+
+      <AdminNav />
+
+      <AdminYellowCards
+        penalties={penalties}
+        allUsers={users.map((u) => ({ id: u.id, gameNick: u.gameNick }))}
+      />
+
       <AdminUsers
         currentUserId={leader.id}
         users={users.map((user) => ({

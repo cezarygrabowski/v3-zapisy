@@ -13,7 +13,7 @@ import {
   toggleUserRole,
 } from "@/lib/actions/admin"
 import { startImpersonation } from "@/lib/actions/impersonation"
-import { PREDEFINED_ROLES } from "@/lib/db/schema"
+import { PREDEFINED_ROLES } from "@/lib/constants"
 import { getUserRoles } from "@/lib/permissions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"

@@ -6,18 +6,18 @@ export type GuildEventType = "v3" | "red_las" | "dungeon" | "other"
 export type RecurrenceType = "none" | "daily" | "weekly" | "weekdays"
 
 export const V3_EVENT_SPOTS = [
-  { id: "R1", name: "R1", desc: "Żółty, od wejścia w górę", color: "#F4D03F" },
-  { id: "R2", name: "R2", desc: "Brąz z koronami, lewo", color: "#C48A55" },
-  { id: "R3", name: "R3", desc: "Seledyn, góra-lewo", color: "#9BB6BA" },
+  { id: "R1", name: "R1", desc: "Od wejścia w górę", color: "#F4D03F" },
+  { id: "R2", name: "R2", desc: "Lewo (z koronami)", color: "#C48A55" },
+  { id: "R3", name: "R3", desc: "Góra-lewo", color: "#9BB6BA" },
   {
     id: "R2_R3_KORYTARZ",
     name: "R2 - R3 korytarz",
-    desc: "Cyan, korytarz (32, 31, 30, 29, 28, 26, 20)",
+    desc: "Najsłabszy spot, nie bije kokonów (32–20)",
     color: "#06B6D4",
   },
-  { id: "PRAWO", name: "Prawo", desc: "Brąz, góra-prawo", color: "#8B5A2B" },
-  { id: "R1_KORYTARZ", name: "R1 korytarz", desc: "Fiolet, środek-dół", color: "#9B6BDB" },
-  { id: "PRAWO_KORYTARZ", name: "Prawo korytarz", desc: "Róż, prawo-dół", color: "#F5C6CE" },
+  { id: "PRAWO", name: "Prawo", desc: "Góra-prawo", color: "#8B5A2B" },
+  { id: "R1_KORYTARZ", name: "R1 korytarz", desc: "Środek-dół", color: "#9B6BDB" },
+  { id: "PRAWO_KORYTARZ", name: "Prawo korytarz", desc: "Prawo-dół", color: "#F5C6CE" },
 ] as const
 
 export const RED_LAS_EVENT_SPOTS = [
@@ -290,7 +290,43 @@ export type EventDetails = {
   signups: EventSignupEntry[]
   allParticipants: { userId: string; gameNick: string; count: number; attendedCount: number }[]
   currentUserFeeLock?: UserFeeLockInfo
+  currentUserPenalty?: UserPenaltyLockInfo | null
+  signupAdvanceDays?: number
   restrictedAccess?: boolean
+  auditLogs?: GuildEventAuditLogEntry[]
+}
+
+export type GuildEventAuditLogEntry = {
+  id: string
+  eventId: string
+  action:
+    | "signup"
+    | "withdraw"
+    | "admin_withdraw"
+    | "admin_assign"
+    | "reschedule"
+    | "edit"
+    | "spot_transfer"
+    | "yellow_card"
+  actorId: string
+  actorNick: string
+  targetUserId: string | null
+  targetUserNick: string | null
+  spot: string | null
+  role: string | null
+  reason: string | null
+  details: string | null
+  createdAt: string
+}
+
+export type UserPenaltyLockInfo = {
+  hasPenalty: boolean
+  cardLevel: number
+  durationDays: number
+  allowedAdvanceDays: number
+  expiresAt: string
+  expiresAtPl: string
+  reason: string
 }
 
 export type UserFeeLockInfo = {

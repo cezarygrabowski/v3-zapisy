@@ -15,9 +15,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const ROLE_V3 = "V3"
-export const PREDEFINED_ROLES = ["V3"] as const
-export type PredefinedRole = (typeof PREDEFINED_ROLES)[number]
+export { ROLE_V3, PREDEFINED_ROLES, type PredefinedRole } from "@/lib/constants"
 
 export const signups = pgTable(
   "signups",
@@ -387,6 +385,7 @@ export const guildEventsRelations = relations(guildEvents, ({ one, many }) => ({
     references: [users.id],
   }),
   signups: many(guildEventSignups),
+  auditLogs: many(guildEventAuditLogs),
 }))
 
 export const guildEventSignupsRelations = relations(guildEventSignups, ({ one }) => ({
@@ -396,6 +395,38 @@ export const guildEventSignupsRelations = relations(guildEventSignups, ({ one })
   }),
   user: one(users, {
     fields: [guildEventSignups.userId],
+    references: [users.id],
+  }),
+}))
+
+export const guildEventAuditLogs = pgTable("guild_event_audit_logs", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id")
+    .notNull()
+    .references(() => guildEvents.id, { onDelete: "cascade" }),
+  action: text("action").notNull(), // 'signup' | 'withdraw' | 'admin_withdraw' | 'admin_assign' | 'reschedule' | 'edit'
+  actorId: text("actor_id")
+    .notNull()
+    .references(() => users.id),
+  targetUserId: text("target_user_id").references(() => users.id),
+  spot: text("spot"),
+  role: text("role"),
+  reason: text("reason"),
+  details: text("details"), // JSON with additional metadata
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const guildEventAuditLogsRelations = relations(guildEventAuditLogs, ({ one }) => ({
+  event: one(guildEvents, {
+    fields: [guildEventAuditLogs.eventId],
+    references: [guildEvents.id],
+  }),
+  actor: one(users, {
+    fields: [guildEventAuditLogs.actorId],
+    references: [users.id],
+  }),
+  targetUser: one(users, {
+    fields: [guildEventAuditLogs.targetUserId],
     references: [users.id],
   }),
 }))
@@ -414,6 +445,45 @@ export const guildSettingsRelations = relations(guildSettings, ({ one }) => ({
   }),
 }))
 
+export const userPenalties = pgTable("user_penalties", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  adminId: text("admin_id")
+    .notNull()
+    .references(() => users.id),
+  eventId: text("event_id")
+    .references(() => guildEvents.id, { onDelete: "set null" }),
+  reason: text("reason").notNull(),
+  cardLevel: integer("card_level").notNull().default(1), // 1: 3d, 2: 7d, 3: 14d
+  durationDays: integer("duration_days").notNull(), // 3, 7, 14
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revokedBy: text("revoked_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const userPenaltiesRelations = relations(userPenalties, ({ one }) => ({
+  user: one(users, {
+    fields: [userPenalties.userId],
+    references: [users.id],
+  }),
+  admin: one(users, {
+    fields: [userPenalties.adminId],
+    references: [users.id],
+  }),
+  event: one(guildEvents, {
+    fields: [userPenalties.eventId],
+    references: [guildEvents.id],
+  }),
+  revoker: one(users, {
+    fields: [userPenalties.revokedBy],
+    references: [users.id],
+  }),
+}))
+
 export type User = typeof users.$inferSelect
 export type Signup = typeof signups.$inferSelect
 export type FeePayment = typeof feePayments.$inferSelect
@@ -428,4 +498,6 @@ export type CustomTimer = typeof customTimers.$inferSelect
 export type CustomTimerKill = typeof customTimerKills.$inferSelect
 export type GuildEvent = typeof guildEvents.$inferSelect
 export type GuildEventSignup = typeof guildEventSignups.$inferSelect
+export type GuildEventAuditLog = typeof guildEventAuditLogs.$inferSelect
 export type GuildSetting = typeof guildSettings.$inferSelect
+export type UserPenalty = typeof userPenalties.$inferSelect

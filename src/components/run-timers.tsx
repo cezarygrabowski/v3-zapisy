@@ -33,7 +33,7 @@ import { playMapSound } from "@/lib/panel-audio"
 const COCOON_MS = 60 * 60 * 1000
 const NETS_MS = 3 * 60 * 1000
 const QUEEN_FIGHT_MS = 5 * 60 * 1000
-const QUEEN_EARLY_MS = 40 * 60 * 1000
+const QUEEN_EARLY_MS = 60 * 60 * 1000
 const QUEEN_LATE_MS = 2 * 60 * 60 * 1000
 
 function pad(value: number) {
@@ -198,13 +198,13 @@ function QueenTimer({
 
   useEffect(() => {
     if (prevPhase.current === "wait" && phase === "window") {
-      ping("Królówka", "Może już spaść. Okno: zbicie − 5 min, potem 40 min–2 h.")
+      ping("Królówka", "Może już spaść. Okno: zbicie − 5 min, potem 1 h–2 h.")
       if (soundEnabled) {
         playTimerSound("baroness", volume / 100)
       }
     }
     if (prevPhase.current === "window" && phase === "over") {
-      ping("Królówka", "Koniec okna — ktoś pewnie nie wpisał zbicia. Kliknij Zbiłem królówkę.")
+      ping("Królówka", "Minęły 2 h od zbicia.")
     }
     prevPhase.current = phase
   }, [phase, soundEnabled, volume])
@@ -237,7 +237,7 @@ function QueenTimer({
           </label>
         </div>
         <CardDescription>
-          Okno 40 min–2 h. Kliknięcie „Zbiłem królówkę” resetuje timer.
+          Okno 1 h–2 h. Kliknięcie „Zbiłem królówkę” resetuje timer.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">

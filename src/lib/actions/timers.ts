@@ -38,6 +38,8 @@ export async function createTimerCategory(input: {
   })
 
   revalidatePath("/timery")
+  revalidatePath("/admin")
+  revalidatePath("/admin/konfiguracja")
   return ok(`Dodano nową mapę: ${name}`)
 }
 
@@ -57,6 +59,8 @@ export async function deleteTimerCategory(categoryId: string): Promise<ActionRes
 
   await db.delete(timerCategories).where(eq(timerCategories.id, categoryId))
   revalidatePath("/timery")
+  revalidatePath("/admin")
+  revalidatePath("/admin/konfiguracja")
   return ok("Usunięto mapę i powiązane z nią timery.")
 }
 
@@ -69,6 +73,10 @@ export async function createCustomTimer(input: {
   notes?: string
 }): Promise<ActionResult> {
   const user = await requireUser()
+  if (!user.isLeader) {
+    return fail("Tylko admin może dodawać timery.")
+  }
+
   const name = input.name.trim()
   if (!name) return fail("Nazwa bossa nie może być pusta.")
 
@@ -89,7 +97,55 @@ export async function createCustomTimer(input: {
   })
 
   revalidatePath("/timery")
+  revalidatePath("/admin")
+  revalidatePath("/admin/konfiguracja")
   return ok(`Dodano bossa/timer: ${name}`)
+}
+
+export async function updateCustomTimer(input: {
+  timerId: string
+  name: string
+  channelsCount: number
+  respawnMinMinutes: number
+  respawnMaxMinutes: number
+  notes?: string
+}): Promise<ActionResult> {
+  const user = await requireUser()
+  if (!user.isLeader) {
+    return fail("Tylko admin może konfigurować parametry bossów.")
+  }
+
+  const name = input.name.trim()
+  if (!name) return fail("Nazwa bossa nie może być pusta.")
+
+  const channelsCount = Math.max(1, Math.min(9, Math.round(input.channelsCount || 5)))
+  const respawnMin = Math.max(1, Math.min(1440, Math.round(input.respawnMinMinutes || 48)))
+  const respawnMax = Math.max(respawnMin, Math.min(1440, Math.round(input.respawnMaxMinutes || 52)))
+
+  const db = await getDb()
+  const [t] = await db
+    .select({ id: customTimers.id })
+    .from(customTimers)
+    .where(eq(customTimers.id, input.timerId))
+
+  if (!t) return fail("Nie znaleziono timera.")
+
+  await db
+    .update(customTimers)
+    .set({
+      name,
+      channelsCount,
+      respawnMinMinutes: respawnMin,
+      respawnMaxMinutes: respawnMax,
+      notes: input.notes?.trim() || null,
+    })
+    .where(eq(customTimers.id, input.timerId))
+
+  revalidatePath("/timery")
+  revalidatePath("/panel")
+  revalidatePath("/admin")
+  revalidatePath("/admin/konfiguracja")
+  return ok(`Zaktualizowano parametry bossa: ${name}`)
 }
 
 export async function deleteCustomTimer(timerId: string): Promise<ActionResult> {
@@ -108,6 +164,8 @@ export async function deleteCustomTimer(timerId: string): Promise<ActionResult> 
 
   await db.delete(customTimers).where(eq(customTimers.id, timerId))
   revalidatePath("/timery")
+  revalidatePath("/admin")
+  revalidatePath("/admin/konfiguracja")
   return ok("Usunięto timer.")
 }
 

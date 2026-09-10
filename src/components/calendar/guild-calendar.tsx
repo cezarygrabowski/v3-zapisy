@@ -39,6 +39,9 @@ export function GuildCalendar({
   allGuildUsers = [],
   initialEventId,
   initialWeekStart,
+  signupAdvanceDays = 2,
+  signupOpenTime = "09:00",
+  userAllowedAdvanceDays,
 }: {
   events: GuildEventListItem[]
   currentUserId?: string
@@ -48,7 +51,11 @@ export function GuildCalendar({
   allGuildUsers?: { id: string; gameNick: string }[]
   initialEventId?: string
   initialWeekStart?: string
+  signupAdvanceDays?: number
+  signupOpenTime?: string
+  userAllowedAdvanceDays?: number
 }) {
+  const effectiveAdvanceDays = userAllowedAdvanceDays ?? signupAdvanceDays
   const userIsAdmin = Boolean(isAdmin || isLeader)
   const router = useRouter()
   const [selectedEventId, setSelectedEventId] = useState<string | null>(initialEventId ?? null)
@@ -962,8 +969,8 @@ export function GuildCalendar({
                                     </Badge>
                                   ) : (
                                     <div className="flex items-center gap-1 shrink-0">
-                                      {evt.type === "v3" && isV3SignupDateLocked(evt.date) ? (
-                                        <span className="text-[10px]" title="Zapisy zablokowane (otwarcie 2 dni przed)">🔒</span>
+                                      {evt.type === "v3" && isV3SignupDateLocked(evt.date, new Date(), effectiveAdvanceDays, signupOpenTime) ? (
+                                        <span className="text-[10px]" title={`Zapisy zablokowane (otwarcie o ${signupOpenTime}, ${effectiveAdvanceDays} ${effectiveAdvanceDays === 1 ? "dzień" : "dni"} przed)`}>🔒</span>
                                       ) : null}
                                       <span className="text-[10px] opacity-80">{meta.icon}</span>
                                     </div>
@@ -1154,7 +1161,7 @@ export function GuildCalendar({
                                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
                               ) : (
                                 <span className="text-[10px] shrink-0 opacity-80">
-                                  {evt.type === "v3" && isV3SignupDateLocked(evt.date) ? "🔒" : meta.icon}
+                                  {evt.type === "v3" && isV3SignupDateLocked(evt.date, new Date(), effectiveAdvanceDays, signupOpenTime) ? "🔒" : meta.icon}
                                 </span>
                               )}
                               <span className={`truncate ${isActive ? "text-emerald-500 font-semibold" : colorPreset.titleText + " group-hover:underline"}`}>
@@ -1212,12 +1219,12 @@ export function GuildCalendar({
                             <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                               {meta.icon} {meta.label}
                             </Badge>
-                            {evt.type === "v3" && isV3SignupDateLocked(evt.date) ? (
+                            {evt.type === "v3" && isV3SignupDateLocked(evt.date, new Date(), effectiveAdvanceDays, signupOpenTime) ? (
                               <Badge
                                 variant="outline"
                                 className="text-[10px] px-1.5 py-0 border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10 gap-0.5"
                               >
-                                🔒 Zapisy zablokowane
+                                🔒 Zapisy zablokowane (od {signupOpenTime})
                               </Badge>
                             ) : null}
                             {evt.mySignup ? (

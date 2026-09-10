@@ -7,7 +7,7 @@ type AppDb = {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 } & ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>
 
-const SCHEMA_VERSION = 3
+const SCHEMA_VERSION = 6
 
 const globalForDb = globalThis as unknown as {
   dbPromise?: Promise<AppDb>
@@ -205,11 +205,41 @@ const SCHEMA_SQL = [
       updated_at timestamptz NOT NULL DEFAULT now(),
       updated_by text REFERENCES users(id)
     )`,
+  `CREATE TABLE IF NOT EXISTS guild_event_audit_logs (
+      id text PRIMARY KEY,
+      event_id text NOT NULL REFERENCES guild_events(id) ON DELETE CASCADE,
+      action text NOT NULL,
+      actor_id text NOT NULL REFERENCES users(id),
+      target_user_id text REFERENCES users(id),
+      spot text,
+      role text,
+      reason text,
+      details text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `CREATE TABLE IF NOT EXISTS user_penalties (
+      id text PRIMARY KEY,
+      user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      admin_id text NOT NULL REFERENCES users(id),
+      event_id text REFERENCES guild_events(id) ON DELETE SET NULL,
+      reason text NOT NULL,
+      card_level integer NOT NULL DEFAULT 1,
+      duration_days integer NOT NULL,
+      issued_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz NOT NULL,
+      revoked_at timestamptz,
+      revoked_by text REFERENCES users(id),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
 ]
 
 async function ensureSchema(db: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }) {
   for (const statement of SCHEMA_SQL) {
-    await db.execute(sql.raw(statement))
+    try {
+      await db.execute(sql.raw(statement))
+    } catch (error) {
+      console.warn("[db] Schema statement notice:", (error as Error)?.message || error)
+    }
   }
 }
 

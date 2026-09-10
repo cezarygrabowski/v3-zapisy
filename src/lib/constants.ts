@@ -77,11 +77,15 @@ export const MAP_ZONES: {
   color: string
   note: string
 }[] = [
-  { position: "R1_KORYTARZ", color: "#9B6BDB", note: "fiolet, środek-dół" },
-  { position: "R1", color: "#F4D03F", note: "żółty, od wejścia w górę" },
-  { position: "R2", color: "#C48A55", note: "brąz z koronami, lewo" },
-  { position: "R3", color: "#9BB6BA", note: "seledyn, góra-lewo" },
-  { position: "R2_R3_KORYTARZ", color: "#06B6D4", note: "cyan, korytarz (32–20)" },
-  { position: "PRAWO", color: "#8B5A2B", note: "brąz, góra-prawo" },
-  { position: "PRAWO_KORYTARZ", color: "#F5C6CE", note: "róż, prawo-dół" },
+  { position: "R1_KORYTARZ", color: "#9B6BDB", note: "środek-dół" },
+  { position: "R1", color: "#F4D03F", note: "od wejścia w górę" },
+  { position: "R2", color: "#C48A55", note: "lewo (z koronami)" },
+  { position: "R3", color: "#9BB6BA", note: "góra-lewo" },
+  { position: "R2_R3_KORYTARZ", color: "#06B6D4", note: "najsłabszy, nie bije kokonów (32–20)" },
+  { position: "PRAWO", color: "#8B5A2B", note: "góra-prawo" },
+  { position: "PRAWO_KORYTARZ", color: "#F5C6CE", note: "prawo-dół" },
 ]
+
+export const ROLE_V3 = "V3"
+export const PREDEFINED_ROLES = ["V3"] as const
+export type PredefinedRole = (typeof PREDEFINED_ROLES)[number]

@@ -8,9 +8,10 @@ import {
   type GuildEventType,
 } from "@/lib/calendar-types"
 import { getDb } from "@/lib/db"
-import { guildEventSignups, guildEvents, users } from "@/lib/db/schema"
+import { guildEventAuditLogs, guildEventSignups, guildEvents, users } from "@/lib/db/schema"
 import { getExpeditionHourBlocks } from "@/lib/red-las"
 import { addDays, pad, todayInWarsaw, warsawMinutes } from "@/lib/dates"
+import { alias } from "drizzle-orm/pg-core"
 
 export * from "@/lib/calendar-types"
 
@@ -330,5 +331,47 @@ export async function getRelevantV3CalendarEvent(now = new Date()): Promise<Even
   }
 
   return null
+}
+
+export async function listGuildEventAuditLogs(eventId: string) {
+  const db = await getDb()
+  const actorUsers = alias(users, "actor_user")
+  const targetUsers = alias(users, "target_user")
+
+  const rows = await db
+    .select({
+      id: guildEventAuditLogs.id,
+      eventId: guildEventAuditLogs.eventId,
+      action: guildEventAuditLogs.action,
+      actorId: guildEventAuditLogs.actorId,
+      actorNick: actorUsers.gameNick,
+      targetUserId: guildEventAuditLogs.targetUserId,
+      targetUserNick: targetUsers.gameNick,
+      spot: guildEventAuditLogs.spot,
+      role: guildEventAuditLogs.role,
+      reason: guildEventAuditLogs.reason,
+      details: guildEventAuditLogs.details,
+      createdAt: guildEventAuditLogs.createdAt,
+    })
+    .from(guildEventAuditLogs)
+    .innerJoin(actorUsers, eq(guildEventAuditLogs.actorId, actorUsers.id))
+    .leftJoin(targetUsers, eq(guildEventAuditLogs.targetUserId, targetUsers.id))
+    .where(eq(guildEventAuditLogs.eventId, eventId))
+    .orderBy(desc(guildEventAuditLogs.createdAt))
+
+  return rows.map((r) => ({
+    id: r.id,
+    eventId: r.eventId,
+    action: r.action as "signup" | "withdraw" | "admin_withdraw" | "admin_assign" | "reschedule" | "edit",
+    actorId: r.actorId,
+    actorNick: r.actorNick,
+    targetUserId: r.targetUserId,
+    targetUserNick: r.targetUserNick,
+    spot: r.spot,
+    role: r.role,
+    reason: r.reason,
+    details: r.details,
+    createdAt: new Date(r.createdAt).toISOString(),
+  }))
 }
 

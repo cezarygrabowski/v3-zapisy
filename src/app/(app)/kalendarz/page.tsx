@@ -28,7 +28,10 @@ export default async function CalendarPage({
     if (targetEnd > endDate) endDate = addDays(targetEnd, 14)
   }
 
-  const [rawEvents, users] = await Promise.all([
+  const { getSignupAdvanceDays, getSignupOpenTime } = await import("@/lib/settings")
+  const { getActivePenaltyForUser } = await import("@/lib/actions/penalties")
+
+  const [rawEvents, users, signupAdvanceDays, signupOpenTime, activePenalty] = await Promise.all([
     listGuildEvents({
       startDate,
       endDate,
@@ -36,6 +39,9 @@ export default async function CalendarPage({
       currentUserId: user.id,
     }),
     listUsers(),
+    getSignupAdvanceDays(),
+    getSignupOpenTime(),
+    getActivePenaltyForUser(user.id),
   ])
 
   // If user does not have V3 access, mask V3 events (keep them visible as scheduled, but hide counts, spots and description)
@@ -61,6 +67,9 @@ export default async function CalendarPage({
       allGuildUsers={users.map((u) => ({ id: u.id, gameNick: u.gameNick }))}
       initialEventId={wydarzenie}
       initialWeekStart={validWeekParam}
+      signupAdvanceDays={signupAdvanceDays}
+      signupOpenTime={signupOpenTime}
+      userAllowedAdvanceDays={activePenalty ? activePenalty.allowedAdvanceDays : undefined}
     />
   )
 }

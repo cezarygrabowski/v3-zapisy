@@ -51,9 +51,19 @@ export async function signUp(input: {
     position: PositionId
   }
 
-  if (isV3SignupDateLocked(date)) {
+  const { getSignupAdvanceDays, getSignupOpenTime } = await import("@/lib/settings")
+  let maxDaysAhead = await getSignupAdvanceDays()
+  const signupOpenTime = await getSignupOpenTime()
+
+  const { getActivePenaltyForUser } = await import("@/lib/actions/penalties")
+  const activePenalty = await getActivePenaltyForUser(user.id)
+  if (activePenalty) {
+    maxDaysAhead = activePenalty.allowedAdvanceDays
+  }
+
+  if (isV3SignupDateLocked(date, new Date(), maxDaysAhead, signupOpenTime)) {
     return fail(
-      `Zapisy na ten event V3 ruszają na 2 dni przed wydarzeniem (od ${formatDatePl(getV3SignupOpenDate(date))}).`
+      `Zapisy na ten event V3 ruszają na ${maxDaysAhead} ${maxDaysAhead === 1 ? "dzień" : "dni"} przed wydarzeniem (od ${formatDatePl(getV3SignupOpenDate(date, maxDaysAhead))} o godz. ${signupOpenTime}).`
     )
   }
 
