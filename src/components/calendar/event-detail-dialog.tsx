@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
-import { Check, Link2, Users } from "lucide-react"
+import { Check, Link2, Users, Crown } from "lucide-react"
 import { toast } from "sonner"
 import {
   deleteGuildEvent,
@@ -23,7 +23,7 @@ import {
   type EventDetails,
   type GuildEventType,
 } from "@/lib/calendar-types"
-import { formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isV3SignupDateLocked } from "@/lib/dates"
+import { formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
 import { positionLabel } from "@/lib/constants"
 import { SpotTransferDialog } from "@/components/calendar/spot-transfer-dialog"
 import { GiveYellowCardDialog } from "@/components/calendar/give-yellow-card-dialog"
@@ -67,6 +67,9 @@ export function EventDetailDialog({
   const [selectedUserId, setSelectedUserId] = useState(allGuildUsers[0]?.id ?? "")
   const [leaderSpotModal, setLeaderSpotModal] = useState<string | null>(null)
 
+  // Character selection for multi-character signup
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null)
+
   // Party signup role
   const [partyRole, setPartyRole] = useState("")
 
@@ -89,6 +92,7 @@ export function EventDetailDialog({
       return
     }
 
+    setSelectedCharacterId(null)
     let active = true
 
     getGuildEventModalDetails(eventId)
@@ -134,13 +138,14 @@ export function EventDetailDialog({
       })
   }
 
-  function handleSpotSignUp(spotId: string, role?: string) {
+  function handleSpotSignUp(spotId: string, role?: string, characterId?: string) {
     if (!event) return
     startTransition(async () => {
       const res = await signUpForGuildEvent({
         eventId: event.id,
         spot: spotId,
         role: role,
+        characterId: characterId || selectedCharacterId || undefined,
       })
       if (!res.ok) {
         toast.error(res.error)
@@ -364,7 +369,14 @@ export function EventDetailDialog({
 
   const meta = event ? EVENT_TYPE_METADATA[event.type] : null
   const colorPreset = event ? getEventColorPreset(event.color) : null
-  const mySignup = event?.signups.find((s) => s.userId === currentUserId)
+  const mySignups = event?.signups.filter((s) => s.userId === currentUserId) ?? []
+  const mySignup = mySignups[0]
+  const userCharacters = event?.currentUserCharacters ?? []
+  const activeChar =
+    userCharacters.find((c) => c.id === selectedCharacterId) ||
+    userCharacters.find((c) => c.isMain) ||
+    userCharacters[0]
+  const isEventDay = Boolean(event && event.date === todayInWarsaw(new Date()))
   const canManage = Boolean(event && (isLeader || event.createdById === currentUserId))
   const isV3 = event?.type === "v3"
   const userPenalty = event?.currentUserPenalty
@@ -704,45 +716,58 @@ export function EventDetailDialog({
                 ) : event.type === "v3" ? (
                   <div className="flex flex-col gap-4">
                     {/* User signup status banner if signed up */}
-                    {mySignup ? (
-                      <div
-                        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border ${colorPreset.cardBg} ${colorPreset.cardBorder}`}
-                      >
-                        <Badge className={`${colorPreset.badgeClass} text-xs px-2.5 py-1 font-medium`}>
-                          Twój spot: {positionLabel(mySignup.spot)} {mySignup.role ? `(${mySignup.role})` : ""}
-                        </Badge>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="xs"
-                            variant="secondary"
-                            className="text-xs h-7 gap-1 font-medium"
-                            onClick={() =>
-                              setTransferModal({
-                                signupId: mySignup.signupId,
-                                spot: mySignup.spot,
-                                ownerNick: mySignup.gameNick,
-                              })
-                            }
+                    {mySignups.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {mySignups.map((signup) => (
+                          <div
+                            key={signup.signupId}
+                            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border ${colorPreset.cardBg} ${colorPreset.cardBorder}`}
                           >
-                            <Users className="size-3" />
-                            Przekaż spot (Zastępstwo)
-                          </Button>
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            className="text-xs text-destructive hover:text-destructive h-7"
-                            onClick={() =>
-                              handleWithdrawClick({
-                                signupId: mySignup.signupId,
-                                userId: currentUserId,
-                                spot: mySignup.spot,
-                              })
-                            }
-                            disabled={pending}
-                          >
-                            Zwolnij spot
-                          </Button>
-                        </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge className={`${colorPreset.badgeClass} text-xs px-2.5 py-1 font-medium`}>
+                                Twój spot: {positionLabel(signup.spot)} {signup.role ? `(${signup.role})` : ""}
+                              </Badge>
+                              {signup.characterName ? (
+                                <Badge variant="outline" className="text-xs font-semibold gap-1 border-primary/30 text-primary">
+                                  <span>👤</span>
+                                  <span>{signup.characterName}</span>
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="xs"
+                                variant="secondary"
+                                className="text-xs h-7 gap-1 font-medium"
+                                onClick={() =>
+                                  setTransferModal({
+                                    signupId: signup.signupId,
+                                    spot: signup.spot,
+                                    ownerNick: signup.characterName || signup.gameNick,
+                                  })
+                                }
+                              >
+                                <Users className="size-3" />
+                                Przekaż spot (Zastępstwo)
+                              </Button>
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                className="text-xs text-destructive hover:text-destructive h-7"
+                                onClick={() =>
+                                  handleWithdrawClick({
+                                    signupId: signup.signupId,
+                                    userId: currentUserId,
+                                    spot: signup.spot,
+                                  })
+                                }
+                                disabled={pending}
+                              >
+                                Zwolnij spot
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : null}
 
@@ -807,6 +832,67 @@ export function EventDetailDialog({
                       </div>
                     ) : null}
 
+                    {/* Multi-character switcher if user has multiple characters */}
+                    {userCharacters.length > 1 ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border bg-muted/40 text-xs">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-semibold text-foreground flex items-center gap-1.5">
+                            <span>Postać do zapisu:</span>
+                            <strong className="text-primary">{activeChar?.name}</strong>
+                            {activeChar?.isMain ? (
+                              <Badge variant="outline" className="text-[9px] h-4 px-1 border-amber-500/40 text-amber-600 dark:text-amber-400 gap-0.5 font-bold">
+                                <Crown className="size-2.5" /> Główna
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[9px] h-4 px-1 text-muted-foreground font-semibold">
+                                Dodatkowa
+                              </Badge>
+                            )}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {!isEventDay
+                              ? "Dodatkowe postacie oraz 2. miejsce na ten sam event można zapisać wyłącznie w dniu wydarzenia."
+                              : "Dzień wydarzenia: możesz zapisać drugą postać (maksymalnie 2 sloty na gracza)."}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {userCharacters.map((char) => {
+                            const isSelected = activeChar?.id === char.id
+                            const isSigned = mySignups.some(
+                              (s) => s.characterId === char.id || s.characterName?.toLowerCase() === char.name.toLowerCase()
+                            )
+                            const isLockedChar = !char.isMain && !isEventDay
+
+                            return (
+                              <Button
+                                key={char.id}
+                                type="button"
+                                size="xs"
+                                variant={isSelected ? "default" : "outline"}
+                                onClick={() => setSelectedCharacterId(char.id)}
+                                disabled={pending}
+                                className={`h-7 text-xs gap-1.5 font-medium transition-all ${
+                                  isSelected ? "shadow-xs ring-1 ring-primary/40 font-bold" : ""
+                                }`}
+                              >
+                                {char.isMain ? <Crown className="size-3 text-amber-400" /> : null}
+                                <span>{char.name}</span>
+                                <span className="text-[9px] opacity-70">({char.isMain ? "Główna" : "Dodatkowa"})</span>
+                                {isSigned ? (
+                                  <Badge variant="secondary" className="text-[9px] h-3.5 px-1 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold">
+                                    Zapisany
+                                  </Badge>
+                                ) : isLockedChar ? (
+                                  <span className="text-[10px]" title="Dostępny w dniu eventu">🔒</span>
+                                ) : null}
+                              </Button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+
                     {/* Vertical list of spots - one under another */}
                     <div className="flex flex-col gap-2.5">
                       {V3_EVENT_SPOTS.map((spot) => {
@@ -815,10 +901,47 @@ export function EventDetailDialog({
                         const isMine = Boolean(
                           spotSignup && (
                             spotSignup.userId === currentUserId ||
-                            (currentUserNick && spotSignup.gameNick?.trim().toLowerCase() === currentUserNick.trim().toLowerCase())
+                            (currentUserNick && (
+                              spotSignup.gameNick?.trim().toLowerCase() === currentUserNick.trim().toLowerCase() ||
+                              spotSignup.userNick?.trim().toLowerCase() === currentUserNick.trim().toLowerCase()
+                            ))
                           )
                         )
                         const canToggle = spotSignup && (isLeader || isMine)
+
+                        const isCharSigned = activeChar
+                          ? mySignups.some(
+                              (s) =>
+                                s.characterId === activeChar.id ||
+                                s.characterName?.toLowerCase() === activeChar.name.toLowerCase()
+                            )
+                          : mySignups.length > 0
+
+                        const isSpotSignupDisabled =
+                          pending ||
+                          isLocked ||
+                          mySignups.length >= 2 ||
+                          isCharSigned ||
+                          Boolean(activeChar && !activeChar.isMain && !isEventDay) ||
+                          Boolean(mySignups.length >= 1 && !isEventDay)
+
+                        const spotButtonLabel = isFeeLocked
+                          ? "Zablokowane (składka)"
+                          : isDateLocked
+                          ? "Zapisy zablokowane"
+                          : mySignups.length >= 2
+                          ? "Maks. 2 postacie"
+                          : isCharSigned
+                          ? `${activeChar?.name ?? "Postać"} już na evencie`
+                          : activeChar && !activeChar.isMain && !isEventDay
+                          ? "Dostępne w dniu eventu"
+                          : mySignups.length >= 1 && !isEventDay
+                          ? "2. postać w dniu eventu"
+                          : mySignups.length === 1
+                          ? `+ Zapisz 2. postać (${activeChar?.name ?? "2. postać"})`
+                          : userCharacters.length > 1 && activeChar
+                          ? `Zajmij (${activeChar.name})`
+                          : "Zajmij spot"
 
                         return (
                           <div
@@ -872,8 +995,13 @@ export function EventDetailDialog({
                               <div className={`flex flex-1 items-center justify-between sm:justify-center gap-3 border px-3 py-1.5 rounded-lg text-xs ${isMine ? "bg-cyan-500/10 border-cyan-500/30" : "bg-background/70"}`}>
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className={`truncate ${isMine ? "text-cyan-700 dark:text-cyan-300 font-bold" : "font-semibold"}`}>
-                                    {spotSignup.gameNick}
+                                    {spotSignup.characterName || spotSignup.gameNick}
                                   </span>
+                                  {spotSignup.userNick && spotSignup.characterName && spotSignup.userNick.toLowerCase() !== spotSignup.characterName.toLowerCase() ? (
+                                    <span className="text-[10px] text-muted-foreground truncate">
+                                      ({spotSignup.userNick})
+                                    </span>
+                                  ) : null}
                                   {spotSignup.role ? (
                                     <Badge
                                       variant="outline"
@@ -904,7 +1032,7 @@ export function EventDetailDialog({
                                         setTransferModal({
                                           signupId: spotSignup.signupId,
                                           spot: spotSignup.spot,
-                                          ownerNick: spotSignup.gameNick,
+                                          ownerNick: spotSignup.characterName || spotSignup.gameNick,
                                         })
                                       }
                                       disabled={pending}
@@ -924,7 +1052,7 @@ export function EventDetailDialog({
                                         handleWithdrawClick({
                                           signupId: spotSignup.signupId,
                                           userId: spotSignup.userId,
-                                          gameNick: spotSignup.gameNick,
+                                          gameNick: spotSignup.characterName || spotSignup.gameNick,
                                           spot: spotSignup.spot,
                                         })
                                       }
@@ -940,16 +1068,10 @@ export function EventDetailDialog({
                                   <Button
                                     size="sm"
                                     className={`h-8 text-xs font-semibold ${colorPreset.badgeClass} shadow-xs px-4`}
-                                    onClick={() => handleSpotSignUp(spot.id)}
-                                    disabled={pending || Boolean(mySignup) || isLocked}
+                                    onClick={() => handleSpotSignUp(spot.id, undefined, activeChar?.id)}
+                                    disabled={isSpotSignupDisabled}
                                   >
-                                    {isFeeLocked
-                                      ? "Zablokowane (składka)"
-                                      : isDateLocked
-                                      ? "Zapisy zablokowane"
-                                      : Boolean(mySignup)
-                                      ? "Zajęto inny spot"
-                                      : "Zajmij spot"}
+                                    {spotButtonLabel}
                                   </Button>
 
                                   {isLeader ? (

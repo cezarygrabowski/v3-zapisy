@@ -7,7 +7,7 @@ type AppDb = {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 } & ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>
 
-const SCHEMA_VERSION = 6
+const SCHEMA_VERSION = 7
 
 const globalForDb = globalThis as unknown as {
   dbPromise?: Promise<AppDb>
@@ -231,6 +231,21 @@ const SCHEMA_SQL = [
       revoked_by text REFERENCES users(id),
       created_at timestamptz NOT NULL DEFAULT now()
     )`,
+  `CREATE TABLE IF NOT EXISTS user_characters (
+      id text PRIMARY KEY,
+      user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name text NOT NULL UNIQUE,
+      playstyle text NOT NULL DEFAULT 'pvm',
+      is_main boolean NOT NULL DEFAULT false,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `ALTER TABLE guild_event_signups ADD COLUMN IF NOT EXISTS character_id text REFERENCES user_characters(id) ON DELETE SET NULL`,
+  `ALTER TABLE guild_event_signups ADD COLUMN IF NOT EXISTS character_name text`,
+  `INSERT INTO user_characters (id, user_id, name, playstyle, is_main, created_at)
+      SELECT id, id, game_nick, COALESCE(playstyle, 'pvm'), true, now()
+      FROM users
+      WHERE id NOT IN (SELECT user_id FROM user_characters)
+      ON CONFLICT DO NOTHING`,
 ]
 
 async function ensureSchema(db: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }) {

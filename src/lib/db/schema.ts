@@ -15,6 +15,17 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
 
+export const userCharacters = pgTable("user_characters", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull().unique(),
+  playstyle: text("playstyle").notNull().default("pvm"),
+  isMain: boolean("is_main").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+})
+
 export { ROLE_V3, PREDEFINED_ROLES, type PredefinedRole } from "@/lib/constants"
 
 export const signups = pgTable(
@@ -340,6 +351,9 @@ export const guildEventSignups = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id),
+    characterId: text("character_id")
+      .references(() => userCharacters.id, { onDelete: "set null" }),
+    characterName: text("character_name"),
     hourIndex: integer("hour_index").notNull().default(0),
     spot: text("spot"), // e.g. "R1", "R2", "PRAWO", "polka", "boss"
     role: text("role"), // e.g. "pvp", "pvm", "Ninja Dagger"
@@ -347,6 +361,14 @@ export const guildEventSignups = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   }
 )
+
+export const userCharactersRelations = relations(userCharacters, ({ one, many }) => ({
+  user: one(users, {
+    fields: [userCharacters.userId],
+    references: [users.id],
+  }),
+  signups: many(guildEventSignups),
+}))
 
 export const timerCategoriesRelations = relations(timerCategories, ({ one, many }) => ({
   creator: one(users, {
@@ -396,6 +418,10 @@ export const guildEventSignupsRelations = relations(guildEventSignups, ({ one })
   user: one(users, {
     fields: [guildEventSignups.userId],
     references: [users.id],
+  }),
+  character: one(userCharacters, {
+    fields: [guildEventSignups.characterId],
+    references: [userCharacters.id],
   }),
 }))
 
@@ -501,3 +527,5 @@ export type GuildEventSignup = typeof guildEventSignups.$inferSelect
 export type GuildEventAuditLog = typeof guildEventAuditLogs.$inferSelect
 export type GuildSetting = typeof guildSettings.$inferSelect
 export type UserPenalty = typeof userPenalties.$inferSelect
+export type UserCharacter = typeof userCharacters.$inferSelect
+export type NewUserCharacter = typeof userCharacters.$inferInsert

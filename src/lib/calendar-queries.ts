@@ -159,6 +159,8 @@ export async function getGuildEventDetails(eventId: string): Promise<EventDetail
     .select({
       signupId: guildEventSignups.id,
       userId: guildEventSignups.userId,
+      characterId: guildEventSignups.characterId,
+      characterName: guildEventSignups.characterName,
       hourIndex: guildEventSignups.hourIndex,
       spot: guildEventSignups.spot,
       role: guildEventSignups.role,
@@ -174,7 +176,10 @@ export async function getGuildEventDetails(eventId: string): Promise<EventDetail
   const entries: EventSignupEntry[] = signupsRows.map((s) => ({
     signupId: s.signupId,
     userId: s.userId,
-    gameNick: s.gameNick,
+    characterId: s.characterId,
+    characterName: s.characterName,
+    gameNick: s.characterName || s.gameNick,
+    userNick: s.gameNick,
     hourIndex: s.hourIndex,
     spot: s.spot,
     role: s.role,

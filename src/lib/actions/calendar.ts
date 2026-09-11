@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { calculateDurationHours, type RecurrenceType } from "@/lib/calendar-types"
-import { addDays, formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isIsoDate, isV3SignupDateLocked } from "@/lib/dates"
+import { addDays, formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isIsoDate, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
 import { getDb } from "@/lib/db"
 import { getCurrentUser, requireUser } from "@/lib/session"
 import { and, eq } from "drizzle-orm"
@@ -144,6 +144,7 @@ export async function signUpForGuildEvent(input: {
   role?: string
   hourIndex?: number
   targetUserId?: string
+  characterId?: string
 }): Promise<ActionResult> {
   const user = await requireUser()
   const db = await getDb()
@@ -161,6 +162,35 @@ export async function signUpForGuildEvent(input: {
     .where(eq(guildEvents.id, input.eventId))
 
   if (!event) return fail("Nie znaleziono wydarzenia.")
+
+  // Resolve target user characters
+  const { listUserCharacters } = await import("@/lib/actions/characters")
+  const userChars = await listUserCharacters(targetUserId)
+
+  let selectedChar = input.characterId
+    ? userChars.find((c) => c.id === input.characterId)
+    : userChars.find((c) => c.isMain) || userChars[0]
+
+  if (!selectedChar) {
+    const targetUser = targetUserId === user.id ? user : await findUserById(targetUserId)
+    selectedChar = {
+      id: targetUserId,
+      name: targetUser?.gameNick || "Gracz",
+      playstyle: (targetUser?.playstyle as "pvp" | "pvm") || "pvm",
+      isMain: true,
+      createdAt: new Date().toISOString(),
+    }
+  }
+
+  const today = todayInWarsaw(new Date())
+  const isEventDay = event.date === today
+
+  // Rule: Non-main character can ONLY be signed up on the day of the event
+  if (!selectedChar.isMain && !isEventDay) {
+    return fail(
+      `Tą postacią („${selectedChar.name}”) możesz zapisać się wyłącznie w dniu wydarzenia (od godz. 00:00). Dzięki temu nie blokujesz miejsc innym graczom z wyprzedzeniem.`
+    )
+  }
 
   // For V3 events, block signups if user does not have V3 access
   if (event.type === "v3") {
@@ -225,9 +255,14 @@ export async function signUpForGuildEvent(input: {
     }
   }
 
-  // Check if this specific user already signed up for this event (unless leader adding multiple)
-  const [existingUser] = await db
-    .select({ id: guildEventSignups.id, spot: guildEventSignups.spot })
+  // Check existing signups for this user on this event
+  const existingUserSignups = await db
+    .select({
+      id: guildEventSignups.id,
+      spot: guildEventSignups.spot,
+      characterId: guildEventSignups.characterId,
+      characterName: guildEventSignups.characterName,
+    })
     .from(guildEventSignups)
     .where(
       and(
@@ -236,36 +271,41 @@ export async function signUpForGuildEvent(input: {
       )
     )
 
-  if (existingUser) {
-    if (input.spot) {
-      return fail(`Gracz jest już zapisany na miejscówkę (${existingUser.spot || "zapisany"}). Zwolnij ją najpierw.`)
-    }
-    return fail("Gracz jest już zapisany na to wydarzenie.")
+  // A: Prevent duplicate signup with the EXACT same character
+  const isCharAlreadySigned = existingUserSignups.some(
+    (s) =>
+      (s.characterId && s.characterId === selectedChar.id) ||
+      (s.characterName && s.characterName.toLowerCase() === selectedChar.name.toLowerCase()) ||
+      (!s.characterName && selectedChar.isMain)
+  )
+  if (isCharAlreadySigned) {
+    return fail(`Postać „${selectedChar.name}” jest już zapisana na to wydarzenie.`)
   }
 
-  // For V3 events, determine role from user's account playstyle if not explicitly provided
-  let userRole = input.role?.trim() || null
-  if (event.type === "v3" && !userRole) {
-    const [targetUser] = await db
-      .select({ playstyle: users.playstyle })
-      .from(users)
-      .where(eq(users.id, targetUserId))
-
-    if (!targetUser?.playstyle) {
+  // B: If user already has a spot on this event and is trying to take a 2nd spot
+  if (existingUserSignups.length > 0) {
+    if (!isEventDay) {
       return fail(
-        targetUserId === user.id
-          ? "Najpierw ustaw PVP albo PVM w koncie (zakładka Konto)."
-          : "Wybrany gracz nie ma ustawionego trybu PVP/PVM w profilu."
+        `Zajmujesz już jedno miejsce na to wydarzenie (${existingUserSignups[0].spot || "zapisany"}). Zapis na drugą postać (alt) jest możliwy wyłącznie w dniu trwania wydarzenia.`
       )
     }
+    if (existingUserSignups.length >= 2) {
+      return fail("Maksymalnie możesz zapisać 2 postacie na jedno wydarzenie.")
+    }
+  }
 
-    userRole = targetUser.playstyle === "pvp" ? "PvP" : "PvM"
+  // Determine role: prefer input role, fallback to character's playstyle, then targetUser's playstyle
+  let userRole = input.role?.trim() || null
+  if (!userRole) {
+    userRole = selectedChar.playstyle === "pvp" ? "PvP" : "PvM"
   }
 
   await db.insert(guildEventSignups).values({
     id: crypto.randomUUID(),
     eventId: input.eventId,
     userId: targetUserId,
+    characterId: selectedChar.id,
+    characterName: selectedChar.name,
     hourIndex: input.hourIndex ?? 0,
     spot: input.spot || null,
     role: userRole,
@@ -284,7 +324,7 @@ export async function signUpForGuildEvent(input: {
       spot: input.spot || null,
       role: userRole,
       reason: null,
-      details: null,
+      details: `Postać: ${selectedChar.name}${selectedChar.isMain ? " (Główna)" : " (Dodatkowa)"}`,
     })
   } catch (err) {
     console.error("Failed to write audit log in signUpForGuildEvent:", err)
@@ -473,14 +513,20 @@ export async function transferSpotToUser(input: {
   }
 
   let newRole = signup.role
+  const { listUserCharacters } = await import("@/lib/actions/characters")
+  const targetChars = await listUserCharacters(input.targetUserId)
+  const targetMainChar = targetChars.find((c) => c.isMain) || targetChars[0]
+
   if (event.type === "v3") {
-    newRole = targetUser.playstyle === "pvp" ? "PvP" : "PvM"
+    newRole = targetMainChar?.playstyle === "pvp" ? "PvP" : targetUser.playstyle === "pvp" ? "PvP" : "PvM"
   }
 
   await db
     .update(guildEventSignups)
     .set({
       userId: input.targetUserId,
+      characterId: targetMainChar?.id || null,
+      characterName: targetMainChar?.name || targetUser.gameNick,
       role: newRole,
     })
     .where(eq(guildEventSignups.id, input.signupId))
@@ -852,10 +898,19 @@ export async function getGuildEventModalDetails(eventId: string) {
           }
         }
 
+        let currentUserCharacters: { id: string; name: string; playstyle: "pvp" | "pvm"; isMain: boolean }[] = []
+        try {
+          const { listUserCharacters } = await import("@/lib/actions/characters")
+          currentUserCharacters = await listUserCharacters(user.id)
+        } catch (err) {
+          console.error("Error fetching currentUserCharacters in getGuildEventModalDetails:", err)
+        }
+
         return {
           ...event,
           currentUserFeeLock,
           currentUserPenalty,
+          currentUserCharacters,
           signupAdvanceDays,
           signupOpenTime,
           restrictedAccess: false,
@@ -864,18 +919,28 @@ export async function getGuildEventModalDetails(eventId: string) {
       }
     }
 
-    // For non-V3 events, also attach auditLogs if user is leader
+    // For non-V3 events, also attach auditLogs and characters if user logged in
+    let currentUserCharacters: { id: string; name: string; playstyle: "pvp" | "pvm"; isMain: boolean }[] = []
+    if (user) {
+      try {
+        const { listUserCharacters } = await import("@/lib/actions/characters")
+        currentUserCharacters = await listUserCharacters(user.id)
+      } catch (err) {
+        console.error("Error fetching currentUserCharacters in getGuildEventModalDetails:", err)
+      }
+    }
+
     if (user?.isLeader) {
       try {
         const { listGuildEventAuditLogs } = await import("@/lib/calendar-queries")
         const auditLogs = await listGuildEventAuditLogs(eventId)
-        return { ...event, auditLogs }
+        return { ...event, currentUserCharacters, auditLogs }
       } catch (err) {
         console.error("Error fetching auditLogs in getGuildEventModalDetails:", err)
       }
     }
 
-    return event
+    return { ...event, currentUserCharacters }
   } catch (err) {
     console.error("Error in getGuildEventModalDetails:", err)
     return null

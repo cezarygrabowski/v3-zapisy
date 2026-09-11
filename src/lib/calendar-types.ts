@@ -259,6 +259,9 @@ export type EventSignupEntry = {
   signupId: string
   userId: string
   gameNick: string
+  characterId?: string | null
+  characterName?: string | null
+  userNick?: string | null
   hourIndex: number
   spot: string | null
   role: string | null
@@ -291,7 +294,14 @@ export type EventDetails = {
   allParticipants: { userId: string; gameNick: string; count: number; attendedCount: number }[]
   currentUserFeeLock?: UserFeeLockInfo
   currentUserPenalty?: UserPenaltyLockInfo | null
+  currentUserCharacters?: {
+    id: string
+    name: string
+    playstyle: "pvp" | "pvm"
+    isMain: boolean
+  }[]
   signupAdvanceDays?: number
+  signupOpenTime?: string
   restrictedAccess?: boolean
   auditLogs?: GuildEventAuditLogEntry[]
 }

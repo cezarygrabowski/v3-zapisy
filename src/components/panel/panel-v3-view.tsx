@@ -103,12 +103,17 @@ export function PanelV3View({
     party,
   }
 
-  // Calendar event my-signup & resolved position
-  const myEventSignup = v3CalendarEvent?.signups.find(
-    (s) =>
-      s.userId === currentUserId ||
-      (currentUserNick && s.gameNick.trim().toLowerCase() === currentUserNick.trim().toLowerCase())
-  )
+  // Calendar event my-signups & resolved position
+  const myEventSignups =
+    v3CalendarEvent?.signups.filter(
+      (s) =>
+        s.userId === currentUserId ||
+        (currentUserNick && (
+          s.gameNick.trim().toLowerCase() === currentUserNick.trim().toLowerCase() ||
+          s.userNick?.trim().toLowerCase() === currentUserNick.trim().toLowerCase()
+        ))
+    ) ?? []
+  const myEventSignup = myEventSignups[0]
 
   // Identify which position is occupied by current user (via calendar signup or slot roster)
   const myPosition =
@@ -293,19 +298,23 @@ export function PanelV3View({
         {/* Quick Self Signup bar if an event exists */}
         {v3CalendarEvent ? (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t pt-2.5 mt-1 text-xs">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-muted-foreground">Twój status:</span>
-              {myEventSignup ? (
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                  ✓ Zapisany na spot {positionLabel(myEventSignup.spot) || "bez miejscówki"} ({myEventSignup.role || "PvM"})
-                </span>
+              {myEventSignups.length > 0 ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {myEventSignups.map((s) => (
+                    <span key={s.signupId} className="font-bold text-emerald-600 dark:text-emerald-400">
+                      ✓ {s.characterName || s.gameNick} ({positionLabel(s.spot) || "bez miejscówki"}, {s.role || "PvM"})
+                    </span>
+                  ))}
+                </div>
               ) : (
                 <span className="text-muted-foreground italic">Nie jesteś jeszcze zapisany na to wydarzenie</span>
               )}
             </div>
 
             <div className="flex items-center gap-2">
-              {!myEventSignup ? (
+              {myEventSignups.length === 0 ? (
                 <div className="flex items-center gap-1.5 bg-background p-1 rounded-md border">
                   <span className="text-[11px] text-muted-foreground px-1">Tryb:</span>
                   <button
@@ -327,16 +336,20 @@ export function PanelV3View({
                     PvP (3 kk)
                   </button>
                 </div>
-              ) : (
+              ) : myEventSignups.length === 1 ? (
                 <Button
                   size="xs"
                   variant="outline"
                   className="text-destructive hover:text-destructive text-[11px] h-6"
                   disabled={pending}
-                  onClick={() => handleWithdrawSpot(myEventSignup.signupId)}
+                  onClick={() => handleWithdrawSpot(myEventSignups[0].signupId)}
                 >
                   Zrezygnuj ze spota
                 </Button>
+              ) : (
+                <span className="text-[11px] text-muted-foreground">
+                  (Miejscówkami możesz zarządzać na liście)
+                </span>
               )}
             </div>
           </div>
@@ -367,9 +380,18 @@ export function PanelV3View({
               {POSITIONS.map((pos) => {
                 const member = byPosition.get(pos.id)
                 const isOccupied = Boolean(member?.userId || member?.gameNick)
-                const isMine = pos.id === myPosition
-                const zoneInfo = MAP_ZONES.find((z) => z.position === pos.id)
                 const spotSignup = v3CalendarEvent?.signups.find((s) => s.spot === pos.id)
+                const isMine = Boolean(
+                  (spotSignup && (
+                    spotSignup.userId === currentUserId ||
+                    (currentUserNick && (
+                      spotSignup.gameNick?.trim().toLowerCase() === currentUserNick.trim().toLowerCase() ||
+                      spotSignup.userNick?.trim().toLowerCase() === currentUserNick.trim().toLowerCase()
+                    ))
+                  )) ||
+                  (!spotSignup && pos.id === myPosition)
+                )
+                const zoneInfo = MAP_ZONES.find((z) => z.position === pos.id)
 
                 return (
                   <div
@@ -404,8 +426,13 @@ export function PanelV3View({
                       {isOccupied ? (
                         <div className="flex items-center gap-1.5">
                           <span className={`truncate ${isMine ? "text-cyan-700 dark:text-cyan-300 font-bold" : "text-foreground font-medium"}`}>
-                            {member?.gameNick}
+                            {spotSignup?.characterName || member?.gameNick}
                           </span>
+                          {spotSignup?.userNick && spotSignup?.characterName && spotSignup.userNick.toLowerCase() !== spotSignup.characterName.toLowerCase() ? (
+                            <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">
+                              ({spotSignup.userNick})
+                            </span>
+                          ) : null}
                           {spotSignup?.role ? (
                             <Badge
                               variant="outline"
@@ -430,7 +457,7 @@ export function PanelV3View({
                                   setTransferModal({
                                     signupId: spotSignup.signupId,
                                     spot: spotSignup.spot,
-                                    ownerNick: member?.gameNick || "",
+                                    ownerNick: spotSignup?.characterName || member?.gameNick || "",
                                   })
                                 }
                                 disabled={pending}
@@ -454,7 +481,7 @@ export function PanelV3View({
                       ) : (
                         <div className="flex items-center gap-1.5">
                           <span className="text-[11px] italic text-muted-foreground">Wolny spot</span>
-                          {v3CalendarEvent && !myEventSignup ? (
+                          {v3CalendarEvent && myEventSignups.length === 0 ? (
                             isFeeLocked ? (
                               <span
                                 className="text-[10px] text-destructive font-medium cursor-help"
