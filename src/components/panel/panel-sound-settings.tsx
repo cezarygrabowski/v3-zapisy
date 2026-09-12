@@ -157,10 +157,14 @@ export function PanelSoundSettingsDialog({
                       <select
                         value={currentSound}
                         onChange={(e) => handleSoundSelect(map.key, e.target.value as SoundType)}
-                        className="h-8 w-full sm:w-[190px] rounded-lg border border-input bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        className="h-8 w-full sm:w-[190px] rounded-lg border border-input bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer [color-scheme:light] dark:[color-scheme:dark] dark:bg-zinc-900 dark:text-zinc-100"
                       >
                         {SOUND_OPTIONS.map((opt) => (
-                          <option key={opt.id} value={opt.id}>
+                          <option
+                            key={opt.id}
+                            value={opt.id}
+                            className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100"
+                          >
                             {opt.label}
                           </option>
                         ))}

@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { AlertTriangleIcon, Edit2Icon, PlusIcon, ShieldAlertIcon, Undo2Icon } from "lucide-react"
+import { AlertTriangleIcon, Edit2Icon, PlusIcon, ShieldAlertIcon, Undo2Icon, ChevronDown } from "lucide-react"
 
 export function AdminYellowCards({
   penalties,
@@ -249,23 +249,37 @@ export function AdminYellowCards({
             <FieldGroup className="py-4 gap-3">
               <Field>
                 <FieldLabel htmlFor="select-user">Wybierz gracza</FieldLabel>
-                <select
-                  id="select-user"
-                  value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  required
-                >
-                  <option value="">-- Wybierz gracza z gildii --</option>
-                  {allUsers
-                    .slice()
-                    .sort((a, b) => a.gameNick.localeCompare(b.gameNick, "pl"))
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.gameNick}
-                      </option>
-                    ))}
-                </select>
+                <div className="relative">
+                  <select
+                    id="select-user"
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                    className="w-full appearance-none rounded-md border border-input bg-background px-3 py-2 pr-9 text-xs text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer [color-scheme:light] dark:[color-scheme:dark] dark:bg-zinc-900 dark:text-zinc-100"
+                    required
+                  >
+                    <option
+                      value=""
+                      className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100"
+                    >
+                      -- Wybierz gracza z gildii --
+                    </option>
+                    {allUsers
+                      .slice()
+                      .sort((a, b) => a.gameNick.localeCompare(b.gameNick, "pl"))
+                      .map((u) => (
+                        <option
+                          key={u.id}
+                          value={u.id}
+                          className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100"
+                        >
+                          {u.gameNick}
+                        </option>
+                      ))}
+                  </select>
+                  <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <ChevronDown className="size-4 opacity-70" />
+                  </div>
+                </div>
               </Field>
 
               <Field>

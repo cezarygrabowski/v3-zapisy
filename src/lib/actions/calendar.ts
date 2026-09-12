@@ -286,7 +286,7 @@ export async function signUpForGuildEvent(input: {
   if (existingUserSignups.length > 0) {
     if (!isEventDay) {
       return fail(
-        `Zajmujesz już jedno miejsce na to wydarzenie (${existingUserSignups[0].spot || "zapisany"}). Zapis na drugą postać (alt) jest możliwy wyłącznie w dniu trwania wydarzenia.`
+        `Zajmujesz już jedno miejsce na to wydarzenie (${existingUserSignups[0].spot || "zapisany"}). Zapis na drugą postać jest możliwy wyłącznie w dniu trwania wydarzenia.`
       )
     }
     if (existingUserSignups.length >= 2) {
@@ -300,17 +300,44 @@ export async function signUpForGuildEvent(input: {
     userRole = selectedChar.playstyle === "pvp" ? "PvP" : "PvM"
   }
 
-  await db.insert(guildEventSignups).values({
-    id: crypto.randomUUID(),
-    eventId: input.eventId,
-    userId: targetUserId,
-    characterId: selectedChar.id,
-    characterName: selectedChar.name,
-    hourIndex: input.hourIndex ?? 0,
-    spot: input.spot || null,
-    role: userRole,
-    attended: true,
-  })
+  // Ensure characterId exists in user_characters to prevent foreign key violation
+  let characterIdToInsert: string | null = null
+  if (selectedChar?.id && selectedChar.id !== targetUserId) {
+    try {
+      const { userCharacters } = await import("@/lib/db/schema")
+      const [charInDb] = await db
+        .select({ id: userCharacters.id })
+        .from(userCharacters)
+        .where(eq(userCharacters.id, selectedChar.id))
+        .limit(1)
+      if (charInDb) {
+        characterIdToInsert = charInDb.id
+      }
+    } catch {
+      characterIdToInsert = null
+    }
+  }
+
+  try {
+    await db.insert(guildEventSignups).values({
+      id: crypto.randomUUID(),
+      eventId: input.eventId,
+      userId: targetUserId,
+      characterId: characterIdToInsert,
+      characterName: selectedChar.name,
+      hourIndex: input.hourIndex ?? 0,
+      spot: input.spot || null,
+      role: userRole,
+      attended: true,
+    })
+  } catch (err) {
+    console.error("[signUpForGuildEvent] Insert error:", err)
+    const { isUniqueViolation } = await import("@/lib/db")
+    if (isUniqueViolation(err)) {
+      return fail("To miejsce zostało już zajęte lub jesteś już zapisany.")
+    }
+    return fail("Wystąpił błąd podczas zapisu na wydarzenie. Spróbuj ponownie za chwilę.")
+  }
 
   // Audit log: record signup or admin assignment
   try {
@@ -521,15 +548,37 @@ export async function transferSpotToUser(input: {
     newRole = targetMainChar?.playstyle === "pvp" ? "PvP" : targetUser.playstyle === "pvp" ? "PvP" : "PvM"
   }
 
-  await db
-    .update(guildEventSignups)
-    .set({
-      userId: input.targetUserId,
-      characterId: targetMainChar?.id || null,
-      characterName: targetMainChar?.name || targetUser.gameNick,
-      role: newRole,
-    })
-    .where(eq(guildEventSignups.id, input.signupId))
+  let validTargetCharId: string | null = null
+  if (targetMainChar?.id) {
+    try {
+      const { userCharacters } = await import("@/lib/db/schema")
+      const [vChar] = await db
+        .select({ id: userCharacters.id })
+        .from(userCharacters)
+        .where(eq(userCharacters.id, targetMainChar.id))
+        .limit(1)
+      if (vChar) {
+        validTargetCharId = vChar.id
+      }
+    } catch {
+      validTargetCharId = null
+    }
+  }
+
+  try {
+    await db
+      .update(guildEventSignups)
+      .set({
+        userId: input.targetUserId,
+        characterId: validTargetCharId,
+        characterName: targetMainChar?.name || targetUser.gameNick,
+        role: newRole,
+      })
+      .where(eq(guildEventSignups.id, input.signupId))
+  } catch (err) {
+    console.error("[transferSpotToUser] Update error:", err)
+    return fail("Nie udało się przekazać miejsca. Spróbuj ponownie.")
+  }
 
   const timeInfo = getTimeUntilEvent(event.date, event.startTime)
 

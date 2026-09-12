@@ -127,4 +127,13 @@
   html {
     @apply font-sans;
   }
+  select {
+    color-scheme: light dark;
+  }
+  .dark select,
+  .dark option {
+    color-scheme: dark;
+    background-color: oklch(0.218 0.008 223.9);
+    color: oklch(0.987 0.002 197.1);
+  }
 }

@@ -1,11 +1,27 @@
 import { eq } from "drizzle-orm"
 import { envLeaderDiscordIds } from "@/lib/constants"
 import { getDb } from "@/lib/db"
-import { users, type User } from "@/lib/db/schema"
+import { userCharacters, users, type User } from "@/lib/db/schema"
 import { hashPassword, parseLogin, parsePassword } from "@/lib/password"
 
 function newId(): string {
   return crypto.randomUUID()
+}
+
+async function seedUserInitialCharacter(userId: string, gameNick: string, playstyle?: string | null) {
+  try {
+    const db = await getDb()
+    await db.insert(userCharacters).values({
+      id: crypto.randomUUID(),
+      userId,
+      name: gameNick,
+      playstyle: (playstyle as "pvp" | "pvm") || "pvm",
+      isMain: true,
+      createdAt: new Date(),
+    }).onConflictDoNothing()
+  } catch (err) {
+    console.warn("[users] Failed to seed initial user character:", err)
+  }
 }
 
 export async function upsertDiscordUser(input: {
@@ -43,6 +59,7 @@ export async function upsertDiscordUser(input: {
       roles: envLeader ? JSON.stringify(["V3"]) : "[]",
     })
     .returning()
+  await seedUserInitialCharacter(created.id, created.gameNick, created.playstyle)
   return created
 }
 
@@ -75,6 +92,7 @@ export async function upsertDevUser(name: string, isLeader: boolean): Promise<Us
       roles: JSON.stringify(["V3"]),
     })
     .returning()
+  await seedUserInitialCharacter(created.id, created.gameNick, created.playstyle)
   return created
 }
 
@@ -123,5 +141,6 @@ export async function createPasswordUser(input: {
       roles: input.isLeader ? JSON.stringify(["V3"]) : "[]",
     })
     .returning()
+  await seedUserInitialCharacter(created.id, created.gameNick, created.playstyle)
   return created
 }

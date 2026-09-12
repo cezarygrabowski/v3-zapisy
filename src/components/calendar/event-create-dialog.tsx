@@ -24,6 +24,7 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { ChevronDown } from "lucide-react"
 
 export function EventCreateDialog({
   open: controlledOpen,
@@ -166,18 +167,27 @@ export function EventCreateDialog({
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="event-type">Kategoria</FieldLabel>
-              <select
-                id="event-type"
-                value={type}
-                onChange={(e) => handleTypeChange(e.target.value as GuildEventType)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {Object.entries(EVENT_TYPE_METADATA).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v.icon} {v.label}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  id="event-type"
+                  value={type}
+                  onChange={(e) => handleTypeChange(e.target.value as GuildEventType)}
+                  className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 py-1 pr-9 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer [color-scheme:light] dark:[color-scheme:dark] dark:bg-zinc-900 dark:text-zinc-100"
+                >
+                  {Object.entries(EVENT_TYPE_METADATA).map(([k, v]) => (
+                    <option
+                      key={k}
+                      value={k}
+                      className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 py-2"
+                    >
+                      {v.icon} {v.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <ChevronDown className="size-4 opacity-70" />
+                </div>
+              </div>
             </Field>
 
             <Field>

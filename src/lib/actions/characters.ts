@@ -47,26 +47,76 @@ export async function listUserCharacters(userId: string): Promise<CharacterItem[
 
     if (!user) return []
 
-    const charId = crypto.randomUUID()
     const playstyle = (user.playstyle as "pvp" | "pvm") || "pvm"
-    await db.insert(userCharacters).values({
-      id: charId,
-      userId: user.id,
-      name: user.gameNick,
-      playstyle,
-      isMain: true,
-      createdAt: new Date(),
-    }).onConflictDoNothing()
 
-    return [
-      {
-        id: charId,
-        name: user.gameNick,
-        playstyle,
-        isMain: true,
-        createdAt: new Date().toISOString(),
-      },
-    ]
+    try {
+      await db
+        .insert(userCharacters)
+        .values({
+          id: crypto.randomUUID(),
+          userId: user.id,
+          name: user.gameNick,
+          playstyle,
+          isMain: true,
+          createdAt: new Date(),
+        })
+        .onConflictDoNothing()
+    } catch (insertErr) {
+      console.warn("[characters] Initial character insert warning:", insertErr)
+    }
+
+    // Always fetch the actual persisted row for this user
+    const seededRows = await db
+      .select()
+      .from(userCharacters)
+      .where(eq(userCharacters.userId, userId))
+      .orderBy(desc(userCharacters.isMain), userCharacters.createdAt)
+
+    if (seededRows.length > 0) {
+      return seededRows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        playstyle: (r.playstyle as "pvp" | "pvm") || "pvm",
+        isMain: r.isMain,
+        createdAt: new Date(r.createdAt).toISOString(),
+      }))
+    }
+
+    // If still empty (e.g. name collided with another user's character), insert with a unique suffix
+    try {
+      const fallbackName = `${user.gameNick} (${user.id.slice(0, 5)})`
+      await db
+        .insert(userCharacters)
+        .values({
+          id: crypto.randomUUID(),
+          userId: user.id,
+          name: fallbackName,
+          playstyle,
+          isMain: true,
+          createdAt: new Date(),
+        })
+        .onConflictDoNothing()
+
+      const retryRows = await db
+        .select()
+        .from(userCharacters)
+        .where(eq(userCharacters.userId, userId))
+        .orderBy(desc(userCharacters.isMain), userCharacters.createdAt)
+
+      if (retryRows.length > 0) {
+        return retryRows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          playstyle: (r.playstyle as "pvp" | "pvm") || "pvm",
+          isMain: r.isMain,
+          createdAt: new Date(r.createdAt).toISOString(),
+        }))
+      }
+    } catch (fallbackErr) {
+      console.warn("[characters] Fallback character insert warning:", fallbackErr)
+    }
+
+    return []
   } catch (error) {
     console.error("[characters] listUserCharacters error:", error)
     return []

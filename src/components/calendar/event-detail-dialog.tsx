@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
-import { Check, Link2, Users, Crown } from "lucide-react"
+import { Check, Link2, Users, Crown, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 import {
   deleteGuildEvent,
@@ -457,22 +457,31 @@ export function EventDetailDialog({
                         <FieldGroup>
                           <Field>
                             <FieldLabel htmlFor="edit-event-type">Kategoria</FieldLabel>
-                            <select
-                              id="edit-event-type"
-                              value={editType}
-                              onChange={(e) => {
-                                const newType = e.target.value as GuildEventType
-                                setEditType(newType)
-                                setEditColor(EVENT_TYPE_METADATA[newType].defaultColor)
-                              }}
-                              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            >
-                              {Object.entries(EVENT_TYPE_METADATA).map(([k, v]) => (
-                                <option key={k} value={k}>
-                                  {v.icon} {v.label}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="relative">
+                              <select
+                                id="edit-event-type"
+                                value={editType}
+                                onChange={(e) => {
+                                  const newType = e.target.value as GuildEventType
+                                  setEditType(newType)
+                                  setEditColor(EVENT_TYPE_METADATA[newType].defaultColor)
+                                }}
+                                className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 py-1 pr-9 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer [color-scheme:light] dark:[color-scheme:dark] dark:bg-zinc-900 dark:text-zinc-100"
+                              >
+                                {Object.entries(EVENT_TYPE_METADATA).map(([k, v]) => (
+                                  <option
+                                    key={k}
+                                    value={k}
+                                    className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 py-2"
+                                  >
+                                    {v.icon} {v.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                <ChevronDown className="size-4 opacity-70" />
+                              </div>
+                            </div>
                           </Field>
 
                           <Field>
@@ -1635,18 +1644,27 @@ export function EventDetailDialog({
           <div className="py-2">
             <Field>
               <FieldLabel htmlFor="modal-leader-user">Gracz gildii</FieldLabel>
-              <select
-                id="modal-leader-user"
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              >
-                {allGuildUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.gameNick}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  id="modal-leader-user"
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 py-1 pr-9 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer [color-scheme:light] dark:[color-scheme:dark] dark:bg-zinc-900 dark:text-zinc-100"
+                >
+                  {allGuildUsers.map((u) => (
+                    <option
+                      key={u.id}
+                      value={u.id}
+                      className="bg-background text-foreground dark:bg-zinc-900 dark:text-zinc-100 py-1.5"
+                    >
+                      {u.gameNick}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <ChevronDown className="size-4 opacity-70" />
+                </div>
+              </div>
             </Field>
           </div>
           <DialogFooter>
