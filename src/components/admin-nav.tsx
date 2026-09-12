@@ -18,6 +18,11 @@ export function AdminNav() {
       label: "⚙️ Konfiguracja",
       exact: false,
     },
+    {
+      href: "/regulamin",
+      label: "📜 Regulamin",
+      exact: true,
+    },
   ]
 
   return (

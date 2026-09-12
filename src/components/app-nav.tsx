@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/kalendarz", label: "📅 Kalendarz" },
   { href: "/skladki", label: "Składki" },
   { href: "/statystyki", label: "Statystyki" },
+  { href: "/regulamin", label: "Regulamin" },
   { href: "/konto", label: "Konto" },
 ]
 

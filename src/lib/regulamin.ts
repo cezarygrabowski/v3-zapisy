@@ -37,6 +37,7 @@ export const ARTICLES = [
     bullets: [
       "minimum dwie umiejętności bojowe na poziomie P",
       "odpowiedni ekwipunek wojenny (nie padniesz na skilla)",
+      "priorytetyzujemy absy / odporności: miecze, dwuręka, sztylety i strzały",
     ],
   },
   {
