@@ -529,3 +529,24 @@ export type GuildSetting = typeof guildSettings.$inferSelect
 export type UserPenalty = typeof userPenalties.$inferSelect
 export type UserCharacter = typeof userCharacters.$inferSelect
 export type NewUserCharacter = typeof userCharacters.$inferInsert
+
+export const v3Enemies = pgTable("v3_enemies", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  guild: text("guild"),
+  characterClass: text("character_class"),
+  isInsideV3: boolean("is_inside_v3").notNull().default(false),
+  spottedAt: timestamp("spotted_at", { withTimezone: true }),
+  spottedBy: text("spotted_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const v3EnemiesRelations = relations(v3Enemies, ({ one }) => ({
+  spotter: one(users, {
+    fields: [v3Enemies.spottedBy],
+    references: [users.id],
+  }),
+}))
+
+export type V3Enemy = typeof v3Enemies.$inferSelect
+export type NewV3Enemy = typeof v3Enemies.$inferInsert

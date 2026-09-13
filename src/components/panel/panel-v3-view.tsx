@@ -18,6 +18,8 @@ import { RunTimers } from "@/components/run-timers"
 import { EventDetailDialog } from "@/components/calendar/event-detail-dialog"
 import { BaronKillDialog } from "@/components/panel/baron-kill-dialog"
 import { SpotTransferDialog } from "@/components/calendar/spot-transfer-dialog"
+import { V3EnemyRadar } from "@/components/panel/v3-enemy-radar"
+import type { V3EnemyItem } from "@/lib/enemy-types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,6 +36,7 @@ export function PanelV3View({
   currentUserId,
   currentUserNick,
   isLeader,
+  v3Enemies = [],
 }: {
   slot: { id: SlotId; label: string; status: "trwa" | "nastepny" | "skonczony" }
   roster: RosterMember[]
@@ -45,6 +48,7 @@ export function PanelV3View({
   currentUserId: string
   currentUserNick?: string
   isLeader: boolean
+  v3Enemies?: V3EnemyItem[]
 }) {
   const [pending, startTransition] = useTransition()
   const [calendarModalOpen, setCalendarModalOpen] = useState(false)
@@ -355,6 +359,9 @@ export function PanelV3View({
           </div>
         ) : null}
       </div>
+
+      {/* V3 Enemy Radar (Instant toggle & Alarm banner) */}
+      <V3EnemyRadar initialEnemies={v3Enemies} isLeader={isLeader} />
 
       {/* Main split: Spots roster & Timers / Kill tracker */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

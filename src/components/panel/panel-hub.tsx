@@ -6,6 +6,7 @@ import type { KillLogItem, RosterMember, RunSyncState } from "@/lib/queries"
 import type { CustomTimerWithChannels, TimerCategoryData } from "@/lib/timers-queries"
 import type { SlotId } from "@/lib/constants"
 import type { EventDetails } from "@/lib/calendar-types"
+import type { V3EnemyItem } from "@/lib/enemy-types"
 import { playMapSound } from "@/lib/panel-audio"
 import { PanelV3View } from "@/components/panel/panel-v3-view"
 import { PanelDefaultView } from "@/components/panel/panel-default-view"
@@ -30,6 +31,7 @@ export function PanelHub({
   currentUserNick,
   isLeader,
   hasV3Role = true,
+  v3Enemies = [],
 }: {
   slot: { id: SlotId; label: string; status: "trwa" | "nastepny" | "skonczony" }
   roster: RosterMember[]
@@ -43,6 +45,7 @@ export function PanelHub({
   currentUserNick?: string
   isLeader: boolean
   hasV3Role?: boolean
+  v3Enemies?: V3EnemyItem[]
 }) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<PanelTab>("default")
@@ -402,6 +405,7 @@ export function PanelHub({
           currentUserId={currentUserId}
           currentUserNick={currentUserNick}
           isLeader={isLeader}
+          v3Enemies={v3Enemies}
         />
       ) : activeTab === "default" ? (
         <PanelDefaultView

@@ -25,8 +25,9 @@ export default async function PanelPage() {
 
   const { getSignupAdvanceDays, getSignupOpenTime } = await import("@/lib/settings")
   const { getActivePenaltyForUser } = await import("@/lib/actions/penalties")
+  const { getV3Enemies } = await import("@/lib/actions/enemies")
 
-  const [roster, v3Kills, syncs, categories, killStats, users, rawV3Event, feeLock, signupAdvanceDays, signupOpenTime, activePenalty] = await Promise.all([
+  const [roster, v3Kills, syncs, categories, killStats, users, rawV3Event, feeLock, signupAdvanceDays, signupOpenTime, activePenalty, v3Enemies] = await Promise.all([
     hasV3 ? getSlotRoster(date, slot.id) : Promise.resolve([]),
     hasV3 ? listKillsForDate(date) : Promise.resolve([]),
     hasV3 ? listRunSyncs() : Promise.resolve([]),
@@ -38,6 +39,7 @@ export default async function PanelPage() {
     getSignupAdvanceDays(),
     getSignupOpenTime(),
     getActivePenaltyForUser(user.id),
+    hasV3 ? getV3Enemies() : Promise.resolve([]),
   ])
 
   const v3CalendarEvent = (hasV3 && rawV3Event)
@@ -77,6 +79,7 @@ export default async function PanelPage() {
       currentUserNick={user.gameNick}
       isLeader={user.isLeader}
       hasV3Role={hasV3}
+      v3Enemies={v3Enemies}
     />
   )
 }
