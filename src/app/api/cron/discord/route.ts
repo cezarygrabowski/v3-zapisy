@@ -85,7 +85,8 @@ export async function GET(request: Request) {
   if (config.feeReminders.enabled) {
     const [targetH] = config.feeReminders.time.split(":")
     const isTargetDay = config.feeReminders.dayOfWeek === currentDayOfWeek
-    const isTargetHour = targetH === currentHourStr
+    // If running under a daily cron (or hour matches), trigger on the designated day
+    const isTargetHour = targetH === currentHourStr || Boolean(process.env.VERCEL)
     const shouldSendThisWeek = config.feeReminders.lastSentWeek !== currentWeekStart
 
     if (isTargetDay && isTargetHour && shouldSendThisWeek) {
