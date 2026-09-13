@@ -76,13 +76,16 @@ export function PanelHub({
     return () => clearInterval(interval)
   }, [])
 
-  // 10-second automatic server refresh to pick up other players' kills
+  // Automatic server refresh for boss timers when not on V3 tab
   useEffect(() => {
+    if (activeTab === "v3") return
     const interval = setInterval(() => {
-      router.refresh()
-    }, 10000)
+      if (!document.hidden) {
+        router.refresh()
+      }
+    }, 15000)
     return () => clearInterval(interval)
-  }, [router])
+  }, [router, activeTab])
 
   // Real-time audio alert per map when any channel enters the respawn window
   // Scoped to active tab: V3 ignores boss timers, Custom filters by selection

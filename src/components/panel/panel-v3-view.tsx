@@ -92,33 +92,50 @@ export function PanelV3View({
       try {
         const res = await fetch("/api/panel/v3-live", {
           cache: "no-store",
-          headers: { "Accept": "application/json" },
+          headers: { Accept: "application/json" },
         })
         if (!res.ok) return
         const data = await res.json()
         if (isCancelled || !data.ok) return
 
         if (Array.isArray(data.v3Enemies)) {
-          setV3Enemies(data.v3Enemies)
+          setV3Enemies((prev) => {
+            const prevStr = JSON.stringify(prev)
+            const nextStr = JSON.stringify(data.v3Enemies)
+            return prevStr === nextStr ? prev : data.v3Enemies
+          })
         }
         if (data.v3CalendarEvent !== undefined) {
           setV3CalendarEvent((prev) => {
-            if (!data.v3CalendarEvent) return null
-            // Preserve client-only fields if necessary (feeLock, penalty)
-            return {
+            if (!data.v3CalendarEvent) {
+              return prev === null ? prev : null
+            }
+            // Compare signups and status
+            const nextEvent = {
               ...data.v3CalendarEvent,
               currentUserFeeLock: prev?.currentUserFeeLock ?? null,
               currentUserPenalty: prev?.currentUserPenalty ?? null,
               signupAdvanceDays: prev?.signupAdvanceDays ?? 2,
               signupOpenTime: prev?.signupOpenTime ?? "09:00",
             }
+            const prevStr = JSON.stringify(prev)
+            const nextStr = JSON.stringify(nextEvent)
+            return prevStr === nextStr ? prev : nextEvent
           })
         }
         if (Array.isArray(data.kills)) {
-          setKills(data.kills)
+          setKills((prev) => {
+            const prevStr = JSON.stringify(prev)
+            const nextStr = JSON.stringify(data.kills)
+            return prevStr === nextStr ? prev : data.kills
+          })
         }
         if (Array.isArray(data.syncs)) {
-          setSyncs(data.syncs)
+          setSyncs((prev) => {
+            const prevStr = JSON.stringify(prev)
+            const nextStr = JSON.stringify(data.syncs)
+            return prevStr === nextStr ? prev : data.syncs
+          })
         }
       } catch {
         // Silently ignore network flickers during polling

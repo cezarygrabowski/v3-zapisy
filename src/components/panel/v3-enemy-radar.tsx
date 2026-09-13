@@ -251,79 +251,81 @@ export function V3EnemyRadar({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* 1. TOP ALARM BANNER (When enemies are in V3) */}
-      {activeEnemies.length > 0 ? (
-        <div className="relative overflow-hidden rounded-xl border-2 border-red-500/70 bg-gradient-to-r from-red-950/80 via-red-900/60 to-red-950/80 p-4 text-white shadow-lg animate-in fade-in duration-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start sm:items-center gap-3">
-              <span className="relative flex h-4 w-4 shrink-0 mt-0.5 sm:mt-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
-              </span>
+      {/* 1. TOP ALARM / STATUS BANNER (Fixed minimum height container to prevent layout jump) */}
+      <div className="min-h-[58px] transition-all duration-200">
+        {activeEnemies.length > 0 ? (
+          <div className="relative overflow-hidden rounded-xl border-2 border-red-500/70 bg-gradient-to-r from-red-950/80 via-red-900/60 to-red-950/80 p-3.5 text-white shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start sm:items-center gap-3">
+                <span className="relative flex h-4 w-4 shrink-0 mt-0.5 sm:mt-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                </span>
 
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-heading font-black text-base text-red-200 tracking-wide uppercase flex items-center gap-1.5">
-                    <ShieldAlert className="size-5 text-red-400" />
-                    WRÓG W V3 ({activeEnemies.length})
-                  </span>
-                </div>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-heading font-black text-base text-red-200 tracking-wide uppercase flex items-center gap-1.5">
+                      <ShieldAlert className="size-5 text-red-400" />
+                      WRÓG W V3 ({activeEnemies.length})
+                    </span>
+                  </div>
 
-                {/* List of currently spotted enemies */}
-                <div className="flex items-center gap-2 flex-wrap pt-0.5">
-                  {activeEnemies.map((enemy) => (
-                    <div
-                      key={enemy.id}
-                      className="inline-flex items-center gap-1.5 bg-red-950/90 border border-red-500/60 text-red-100 rounded-lg px-2.5 py-1 text-xs shadow-xs"
-                    >
-                      <span className="font-bold">{enemy.name}</span>
-                      {enemy.guild ? (
-                        <span className="text-red-300/80 text-[11px]">[{enemy.guild}]</span>
-                      ) : null}
-                      {enemy.spottedAt ? (
-                        <span className="text-[10px] text-red-300/70 font-mono">
-                          • {formatMinutesAgo(enemy.spottedAt)}
-                        </span>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => handleToggle(enemy.id)}
-                        disabled={pending}
-                        title="Odznacz (zszedł z V3)"
-                        className="ml-1 text-red-300 hover:text-white transition-colors cursor-pointer"
+                  {/* List of currently spotted enemies */}
+                  <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                    {activeEnemies.map((enemy) => (
+                      <div
+                        key={enemy.id}
+                        className="inline-flex items-center gap-1.5 bg-red-950/90 border border-red-500/60 text-red-100 rounded-lg px-2.5 py-1 text-xs shadow-xs"
                       >
-                        <X className="size-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                        <span className="font-bold">{enemy.name}</span>
+                        {enemy.guild ? (
+                          <span className="text-red-300/80 text-[11px]">[{enemy.guild}]</span>
+                        ) : null}
+                        {enemy.spottedAt ? (
+                          <span className="text-[10px] text-red-300/70 font-mono">
+                            • {formatMinutesAgo(enemy.spottedAt)}
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => handleToggle(enemy.id)}
+                          disabled={pending}
+                          title="Odznacz (zszedł z V3)"
+                          className="ml-1 text-red-300 hover:text-white transition-colors cursor-pointer"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleClearAll}
-              disabled={pending}
-              className="bg-red-950/80 hover:bg-red-900 border-red-500/50 text-white font-semibold text-xs h-8 shrink-0 gap-1.5 shadow-xs"
-            >
-              <CheckCircle2 className="size-4 text-emerald-400" />
-              <span>Wszyscy zeszli / Czysto</span>
-            </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleClearAll}
+                disabled={pending}
+                className="bg-red-950/80 hover:bg-red-900 border-red-500/50 text-white font-semibold text-xs h-8 shrink-0 gap-1.5 shadow-xs"
+              >
+                <CheckCircle2 className="size-4 text-emerald-400" />
+                <span>Wszyscy zeszli / Czysto</span>
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : (
-        /* Status neutralny: czysto */
-        <div className="flex items-center justify-between bg-emerald-950/15 border border-emerald-500/25 rounded-xl px-3.5 py-2 text-xs">
-          <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-medium">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <span>Radar V3: <strong>Czysto</strong> (brak zgłoszonych wrogów w komnacie)</span>
+        ) : (
+          /* Status neutralny: czysto */
+          <div className="flex items-center justify-between bg-emerald-950/15 border border-emerald-500/25 rounded-xl px-3.5 py-3 text-xs min-h-[58px]">
+            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-medium">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span>Radar V3: <strong>Czysto</strong> (brak zgłoszonych wrogów w komnacie)</span>
+            </div>
+            <span className="text-[11px] text-muted-foreground hidden sm:inline">
+              Kliknij wroga poniżej, aby natychmiast go oznaczyć (1 klik).
+            </span>
           </div>
-          <span className="text-[11px] text-muted-foreground hidden sm:inline">
-            Kliknij wroga poniżej, aby natychmiast go oznaczyć (1 klik).
-          </span>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* 2. RADAR CARD & QUICK-TOGGLE ROSTER */}
       <Card className="border shadow-xs">
