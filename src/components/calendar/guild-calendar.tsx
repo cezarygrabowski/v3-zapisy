@@ -8,6 +8,8 @@ import {
   calculateDurationHours,
   computeEventEffectiveStatus,
   EVENT_TYPE_METADATA,
+  formatEventSignupCount,
+  formatEventSignupLabel,
   getEventColorPreset,
   type GuildEventListItem,
   type GuildEventType,
@@ -1010,7 +1012,7 @@ export function GuildCalendar({
                                       🔒 Grupa V3
                                     </span>
                                   ) : (
-                                    <span className="font-medium shrink-0 ml-1">{evt.uniqueUsersCount} os.</span>
+                                    <span className="font-medium shrink-0 ml-1">{formatEventSignupCount(evt)}</span>
                                   )}
                                 </div>
                               ) : null}
@@ -1175,7 +1177,7 @@ export function GuildCalendar({
                                   {evt.mySignup.spot ? positionLabel(evt.mySignup.spot) : "Zapisany"}
                                 </span>
                               ) : (
-                                <span>{evt.uniqueUsersCount} os.</span>
+                                <span>{formatEventSignupCount(evt)}</span>
                               )}
                             </div>
                           </button>
@@ -1276,7 +1278,7 @@ export function GuildCalendar({
                             {evt.type === "v3" && !hasV3Role ? (
                               <span className="text-amber-500 font-semibold">🔒 Grupa V3 (Dostęp ograniczony)</span>
                             ) : (
-                              `${evt.uniqueUsersCount} osób (${evt.totalSignups} pozycji)`
+                              formatEventSignupLabel(evt)
                             )}
                           </span>
                         </div>

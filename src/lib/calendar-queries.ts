@@ -193,20 +193,14 @@ export async function getGuildEventDetails(eventId: string): Promise<EventDetail
     signups: entries.filter((s) => s.hourIndex === block.index),
   }))
 
-  const participantMap = new Map<string, { userId: string; gameNick: string; count: number; attendedCount: number }>()
-  for (const s of entries) {
-    let p = participantMap.get(s.userId)
-    if (!p) {
-      p = { userId: s.userId, gameNick: s.gameNick, count: 0, attendedCount: 0 }
-      participantMap.set(s.userId, p)
-    }
-    p.count += 1
-    if (s.attended) p.attendedCount += 1
-  }
-
-  const allParticipants = [...participantMap.values()].sort(
-    (a, b) => b.count - a.count || a.gameNick.localeCompare(b.gameNick, "pl")
-  )
+  const allParticipants = entries
+    .map((s) => ({
+      userId: s.userId,
+      gameNick: s.characterName || s.gameNick,
+      count: 1,
+      attendedCount: s.attended ? 1 : 0,
+    }))
+    .sort((a, b) => a.gameNick.localeCompare(b.gameNick, "pl"))
 
   return {
     id: event.id,

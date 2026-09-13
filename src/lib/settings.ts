@@ -5,6 +5,7 @@ import { addDays, formatDatePl, todayInWarsaw, weekStartInWarsaw } from "@/lib/d
 import { getFeeLedger, listPendingPayments } from "@/lib/queries"
 
 export * from "@/lib/settings-types"
+export * from "@/lib/discord-types"
 import {
   DEFAULT_FEE_SETTLEMENT_DAYS,
   DEFAULT_PENALTY_RULES,
@@ -202,3 +203,61 @@ export async function checkUserFeeLock(
     pendingAmountKk,
   }
 }
+
+export async function getDiscordConfig(): Promise<import("@/lib/discord-types").DiscordConfig> {
+  const { DEFAULT_DISCORD_CONFIG, SETTING_KEY_DISCORD_CONFIG } = await import("@/lib/discord-types")
+  try {
+    const db = await getDb()
+    const [row] = await db
+      .select({ value: guildSettings.value })
+      .from(guildSettings)
+      .where(eq(guildSettings.key, SETTING_KEY_DISCORD_CONFIG))
+
+    if (!row?.value) return DEFAULT_DISCORD_CONFIG
+    const parsed = JSON.parse(row.value) as Partial<import("@/lib/discord-types").DiscordConfig>
+    return {
+      webhookUrl: (parsed.webhookUrl ?? DEFAULT_DISCORD_CONFIG.webhookUrl).trim(),
+      dailyEvents: {
+        enabled: parsed.dailyEvents?.enabled ?? DEFAULT_DISCORD_CONFIG.dailyEvents.enabled,
+        time: parsed.dailyEvents?.time ?? DEFAULT_DISCORD_CONFIG.dailyEvents.time,
+        roleMention: parsed.dailyEvents?.roleMention ?? DEFAULT_DISCORD_CONFIG.dailyEvents.roleMention,
+        lastSentDate: parsed.dailyEvents?.lastSentDate,
+      },
+      feeReminders: {
+        enabled: parsed.feeReminders?.enabled ?? DEFAULT_DISCORD_CONFIG.feeReminders.enabled,
+        dayOfWeek: parsed.feeReminders?.dayOfWeek ?? DEFAULT_DISCORD_CONFIG.feeReminders.dayOfWeek,
+        time: parsed.feeReminders?.time ?? DEFAULT_DISCORD_CONFIG.feeReminders.time,
+        roleMention: parsed.feeReminders?.roleMention ?? DEFAULT_DISCORD_CONFIG.feeReminders.roleMention,
+        lastSentWeek: parsed.feeReminders?.lastSentWeek,
+      },
+    }
+  } catch (err) {
+    console.error("Failed to query discord config, using default:", err)
+    return DEFAULT_DISCORD_CONFIG
+  }
+}
+
+export async function saveDiscordConfig(
+  config: import("@/lib/discord-types").DiscordConfig,
+  userId?: string
+): Promise<void> {
+  const { SETTING_KEY_DISCORD_CONFIG } = await import("@/lib/discord-types")
+  const db = await getDb()
+  await db
+    .insert(guildSettings)
+    .values({
+      key: SETTING_KEY_DISCORD_CONFIG,
+      value: JSON.stringify(config),
+      updatedBy: userId ?? null,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: guildSettings.key,
+      set: {
+        value: JSON.stringify(config),
+        updatedBy: userId ?? null,
+        updatedAt: new Date(),
+      },
+    })
+}
+

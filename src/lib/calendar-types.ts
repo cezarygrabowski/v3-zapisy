@@ -39,6 +39,48 @@ export function calculateDurationHours(startTime: string, endTime: string): numb
   return Math.max(0.5, Math.round(((endMins - startMins) / 60) * 2) / 2)
 }
 
+/**
+ * Format event signup count badge according to rules:
+ * - V3: always shows /7 (e.g. 5/7)
+ * - Defined maxParticipants: shows /max (e.g. 3/8)
+ * - Otherwise: no limit shown, just character count (e.g. 4 os.)
+ */
+export function formatEventSignupCount(event: {
+  type: string
+  totalSignups: number
+  maxParticipants?: number | null
+}): string {
+  if (event.type === "v3") {
+    return `${event.totalSignups}/7`
+  }
+  if (event.maxParticipants && event.maxParticipants > 0) {
+    return `${event.totalSignups}/${event.maxParticipants}`
+  }
+  return `${event.totalSignups} os.`
+}
+
+/**
+ * Format event signup label for agenda / detailed lists:
+ * - V3: e.g. "5/7 postaci"
+ * - Defined maxParticipants: e.g. "3/8 postaci"
+ * - Otherwise: e.g. "4 postacie", "1 postać", "5 postaci"
+ */
+export function formatEventSignupLabel(event: {
+  type: string
+  totalSignups: number
+  maxParticipants?: number | null
+}): string {
+  if (event.type === "v3") {
+    return `${event.totalSignups}/7 postaci`
+  }
+  if (event.maxParticipants && event.maxParticipants > 0) {
+    return `${event.totalSignups}/${event.maxParticipants} postaci`
+  }
+  const n = event.totalSignups
+  const plural = n === 1 ? "postać" : n >= 2 && n <= 4 ? "postacie" : "postaci"
+  return `${n} ${plural}`
+}
+
 export function computeEventEffectiveStatus(
   status: string,
   date: string,

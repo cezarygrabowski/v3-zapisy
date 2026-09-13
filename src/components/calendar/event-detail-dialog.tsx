@@ -724,6 +724,21 @@ export function EventDetailDialog({
                   </div>
                 ) : event.type === "v3" ? (
                   <div className="flex flex-col gap-4">
+                    {/* V3 Spots Occupancy Status */}
+                    <div className="flex items-center justify-between bg-muted/40 border rounded-xl px-3.5 py-2.5 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground">Obsadzone spoty:</span>
+                        <Badge variant="secondary" className="font-mono text-xs font-semibold">
+                          {event.signups.length} / 7
+                        </Badge>
+                        {event.signups.length >= 7 ? (
+                          <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0 font-medium">Komplet</Badge>
+                        ) : null}
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">
+                        {event.signups.length >= 7 ? "Wszystkie spoty obsadzone" : `Wolne miejsca: ${Math.max(0, 7 - event.signups.length)}`}
+                      </span>
+                    </div>
                     {/* User signup status banner if signed up */}
                     {mySignups.length > 0 ? (
                       <div className="flex flex-col gap-2">
@@ -1221,13 +1236,13 @@ export function EventDetailDialog({
                       <div className="flex items-center justify-between">
                         <h3 className="font-heading font-semibold text-sm">Skład Party / Uczestnicy</h3>
                         <Badge variant="secondary" className="font-mono text-xs">
-                          {event.signups.length}{event.maxParticipants ? ` / ${event.maxParticipants}` : ""} graczy
+                          {event.signups.length}{event.maxParticipants ? ` / ${event.maxParticipants}` : ""} postaci
                         </Badge>
                       </div>
 
                       {event.signups.length === 0 ? (
                         <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
-                          Brak zapisanych osób. Bądź pierwszy!
+                          Brak zapisanych postaci. Bądź pierwszy!
                         </div>
                       ) : (
                         <div className="flex flex-col gap-1.5 max-h-[360px] overflow-y-auto pr-1">

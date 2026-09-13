@@ -2,6 +2,7 @@ import test, { describe } from "node:test"
 import assert from "node:assert/strict"
 import { isV3SignupDateLocked, getV3SignupOpenDate } from "@/lib/dates"
 import { hasV3Access, isUserVerified, getUserRoles } from "@/lib/permissions"
+import { formatEventSignupCount, formatEventSignupLabel } from "@/lib/calendar-types"
 
 describe("V3 Signup Date & Time Lock Rules", () => {
   test("allows signup on the event day", () => {
@@ -166,5 +167,29 @@ describe("Multi-Character & Event Signup Business Rules", () => {
         (s.characterName && s.characterName.toLowerCase() === differentChar.name.toLowerCase())
     )
     assert.equal(isDiffSigned, false, "Different character should be allowed")
+  })
+})
+
+describe("Event Signup Count and Limit Formatting", () => {
+  test("V3 always enforces /7 limit", () => {
+    assert.equal(formatEventSignupCount({ type: "v3", totalSignups: 0 }), "0/7")
+    assert.equal(formatEventSignupCount({ type: "v3", totalSignups: 5 }), "5/7")
+    assert.equal(formatEventSignupCount({ type: "v3", totalSignups: 7 }), "7/7")
+    assert.equal(formatEventSignupLabel({ type: "v3", totalSignups: 5 }), "5/7 postaci")
+  })
+
+  test("Event with maxParticipants shows /max limit", () => {
+    assert.equal(formatEventSignupCount({ type: "dungeon", totalSignups: 3, maxParticipants: 8 }), "3/8")
+    assert.equal(formatEventSignupLabel({ type: "dungeon", totalSignups: 3, maxParticipants: 8 }), "3/8 postaci")
+  })
+
+  test("Event without maxParticipants does NOT show limit", () => {
+    assert.equal(formatEventSignupCount({ type: "red_las", totalSignups: 4 }), "4 os.")
+    assert.equal(formatEventSignupCount({ type: "other", totalSignups: 10 }), "10 os.")
+    assert.equal(formatEventSignupCount({ type: "dungeon", totalSignups: 2, maxParticipants: null }), "2 os.")
+
+    assert.equal(formatEventSignupLabel({ type: "red_las", totalSignups: 1 }), "1 postać")
+    assert.equal(formatEventSignupLabel({ type: "red_las", totalSignups: 3 }), "3 postacie")
+    assert.equal(formatEventSignupLabel({ type: "red_las", totalSignups: 5 }), "5 postaci")
   })
 })
