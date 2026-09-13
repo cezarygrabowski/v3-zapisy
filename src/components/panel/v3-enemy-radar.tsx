@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import { toast } from "sonner"
 import {
   clearAllV3Enemies,
@@ -30,11 +30,25 @@ function formatMinutesAgo(isoDate: string | null): string {
 export function V3EnemyRadar({
   initialEnemies = [],
   isLeader = false,
+  enemies: controlledEnemies,
+  onEnemiesChange,
 }: {
   initialEnemies?: V3EnemyItem[]
   isLeader?: boolean
+  enemies?: V3EnemyItem[]
+  onEnemiesChange?: (updater: (prev: V3EnemyItem[]) => V3EnemyItem[]) => void
 }) {
-  const [enemies, setEnemies] = useState<V3EnemyItem[]>(initialEnemies)
+  const [localEnemies, setLocalEnemies] = useState<V3EnemyItem[]>(initialEnemies)
+  const enemies = controlledEnemies ?? localEnemies
+
+  const updateEnemies = (updater: (prev: V3EnemyItem[]) => V3EnemyItem[]) => {
+    if (onEnemiesChange) {
+      onEnemiesChange(updater)
+    } else {
+      setLocalEnemies(updater)
+    }
+  }
+
   const [pending, startTransition] = useTransition()
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -44,10 +58,12 @@ export function V3EnemyRadar({
   const [newClass, setNewClass] = useState<string>("Wojownik")
   const [showAddForm, setShowAddForm] = useState(false)
 
-  // Keep local state in sync if server props update
-  useMemo(() => {
-    setEnemies(initialEnemies)
-  }, [initialEnemies])
+  // Keep local state in sync if initialEnemies change and no controlled state
+  useEffect(() => {
+    if (!controlledEnemies) {
+      setLocalEnemies(initialEnemies)
+    }
+  }, [initialEnemies, controlledEnemies])
 
   const activeEnemies = useMemo(
     () => enemies.filter((e) => e.isInsideV3),
@@ -68,7 +84,7 @@ export function V3EnemyRadar({
   // 1-Click Toggle: 0ms visual update
   const handleToggle = (enemyId: string) => {
     // Optimistic UI update
-    setEnemies((prev) =>
+    updateEnemies((prev) =>
       prev.map((e) => {
         if (e.id === enemyId) {
           const nextInside = !e.isInsideV3
@@ -87,7 +103,7 @@ export function V3EnemyRadar({
       if (!res.ok) {
         toast.error(res.error || "Błąd zmiany statusu wroga.")
         // Rollback
-        setEnemies(initialEnemies)
+        updateEnemies(() => initialEnemies)
       } else {
         toast.success(res.message)
       }
@@ -98,7 +114,7 @@ export function V3EnemyRadar({
   const handleClearAll = () => {
     if (activeEnemies.length === 0) return
 
-    setEnemies((prev) =>
+    updateEnemies((prev) =>
       prev.map((e) => ({
         ...e,
         isInsideV3: false,
@@ -110,7 +126,7 @@ export function V3EnemyRadar({
       const res = await clearAllV3Enemies()
       if (!res.ok) {
         toast.error(res.error || "Błąd resetowania statusu.")
-        setEnemies(initialEnemies)
+        updateEnemies(() => initialEnemies)
       } else {
         toast.success("V3 oznaczone jako czyste!")
       }
@@ -141,7 +157,7 @@ export function V3EnemyRadar({
         setNewGuild("")
         setShowAddForm(false)
         if (res.data) {
-          setEnemies((prev) => {
+          updateEnemies((prev) => {
             const exists = prev.some((e) => e.name.toLowerCase() === res.data!.name.toLowerCase())
             if (exists) {
               return prev.map((e) =>
@@ -159,13 +175,13 @@ export function V3EnemyRadar({
   const handleDeleteEnemy = (enemyId: string, enemyName: string) => {
     if (!confirm(`Czy na pewno usunąć wroga „${enemyName}” z bazy?`)) return
 
-    setEnemies((prev) => prev.filter((e) => e.id !== enemyId))
+    updateEnemies((prev) => prev.filter((e) => e.id !== enemyId))
 
     startTransition(async () => {
       const res = await deleteV3Enemy(enemyId)
       if (!res.ok) {
         toast.error(res.error || "Błąd usuwania wroga.")
-        setEnemies(initialEnemies)
+        updateEnemies(() => initialEnemies)
       } else {
         toast.success("Usunięto z listy.")
       }

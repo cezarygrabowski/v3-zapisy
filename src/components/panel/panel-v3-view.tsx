@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { recordBaronKill, recordQueenKill, undoKill } from "@/lib/actions/run"
@@ -28,15 +28,15 @@ import { Spinner } from "@/components/ui/spinner"
 export function PanelV3View({
   slot,
   roster,
-  kills,
-  syncs,
-  v3CalendarEvent,
+  kills: initialKills,
+  syncs: initialSyncs,
+  v3CalendarEvent: initialV3CalendarEvent,
   queenCounts,
   users,
   currentUserId,
   currentUserNick,
   isLeader,
-  v3Enemies = [],
+  v3Enemies: initialV3Enemies = [],
 }: {
   slot: { id: SlotId; label: string; status: "trwa" | "nastepny" | "skonczony" }
   roster: RosterMember[]
@@ -59,6 +59,78 @@ export function PanelV3View({
     ownerNick: string
   } | null>(null)
   const [v3Playstyle, setV3Playstyle] = useState<"PvM" | "PvP">("PvM")
+
+  // Live real-time state
+  const [v3Enemies, setV3Enemies] = useState<V3EnemyItem[]>(initialV3Enemies)
+  const [v3CalendarEvent, setV3CalendarEvent] = useState<EventDetails | null | undefined>(initialV3CalendarEvent)
+  const [kills, setKills] = useState<KillLogItem[]>(initialKills)
+  const [syncs, setSyncs] = useState<RunSyncState[]>(initialSyncs)
+
+  // Sync with initial props if reloaded
+  useEffect(() => {
+    setV3Enemies(initialV3Enemies)
+  }, [initialV3Enemies])
+
+  useEffect(() => {
+    setV3CalendarEvent(initialV3CalendarEvent)
+  }, [initialV3CalendarEvent])
+
+  useEffect(() => {
+    setKills(initialKills)
+  }, [initialKills])
+
+  useEffect(() => {
+    setSyncs(initialSyncs)
+  }, [initialSyncs])
+
+  // 3-second live background polling (only when page is visible)
+  useEffect(() => {
+    let isCancelled = false
+
+    const pollLiveState = async () => {
+      if (document.hidden) return
+      try {
+        const res = await fetch("/api/panel/v3-live", {
+          cache: "no-store",
+          headers: { "Accept": "application/json" },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        if (isCancelled || !data.ok) return
+
+        if (Array.isArray(data.v3Enemies)) {
+          setV3Enemies(data.v3Enemies)
+        }
+        if (data.v3CalendarEvent !== undefined) {
+          setV3CalendarEvent((prev) => {
+            if (!data.v3CalendarEvent) return null
+            // Preserve client-only fields if necessary (feeLock, penalty)
+            return {
+              ...data.v3CalendarEvent,
+              currentUserFeeLock: prev?.currentUserFeeLock ?? null,
+              currentUserPenalty: prev?.currentUserPenalty ?? null,
+              signupAdvanceDays: prev?.signupAdvanceDays ?? 2,
+              signupOpenTime: prev?.signupOpenTime ?? "09:00",
+            }
+          })
+        }
+        if (Array.isArray(data.kills)) {
+          setKills(data.kills)
+        }
+        if (Array.isArray(data.syncs)) {
+          setSyncs(data.syncs)
+        }
+      } catch {
+        // Silently ignore network flickers during polling
+      }
+    }
+
+    const interval = setInterval(pollLiveState, 3000)
+    return () => {
+      isCancelled = true
+      clearInterval(interval)
+    }
+  }, [])
 
   // If there's an active/upcoming V3 calendar event with spots, use its spots as the roster
   const calendarSpotsRoster: RosterMember[] | null = v3CalendarEvent
@@ -360,8 +432,13 @@ export function PanelV3View({
         ) : null}
       </div>
 
-      {/* V3 Enemy Radar (Instant toggle & Alarm banner) */}
-      <V3EnemyRadar initialEnemies={v3Enemies} isLeader={isLeader} />
+      {/* V3 Enemy Radar (Instant toggle & Alarm banner with 3s live polling) */}
+      <V3EnemyRadar
+        initialEnemies={v3Enemies}
+        enemies={v3Enemies}
+        onEnemiesChange={setV3Enemies}
+        isLeader={isLeader}
+      />
 
       {/* Main split: Spots roster & Timers / Kill tracker */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -653,7 +730,11 @@ export function PanelV3View({
           currentSpot={transferModal.spot}
           currentOwnerNick={transferModal.ownerNick}
           allUsers={users}
-          existingParticipantUserIds={v3CalendarEvent?.signups.map((s) => s.userId)}
+          existingParticipantUserIds={
+            v3CalendarEvent?.signups
+              .map((s) => s.userId)
+              .filter((id): id is string => typeof id === "string") ?? []
+          }
         />
       )}
     </div>
