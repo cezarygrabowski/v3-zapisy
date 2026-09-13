@@ -6,7 +6,7 @@ import { getDb } from "@/lib/db"
 import { v3Enemies, users } from "@/lib/db/schema"
 import { requireUser, requireLeader } from "@/lib/session"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
-import type { QuickAddEnemyInput, V3EnemyItem } from "@/lib/enemy-types"
+import type { QuickAddEnemyInput, UpdateEnemyInput, V3EnemyItem } from "@/lib/enemy-types"
 
 function safeRevalidate() {
   try {
@@ -210,6 +210,62 @@ export async function clearAllV3Enemies(options?: { skipAuth?: boolean }): Promi
 }
 
 /**
+ * Edits an enemy's details (name, guild, characterClass).
+ */
+export async function updateV3Enemy(
+  input: UpdateEnemyInput,
+  options?: { skipAuth?: boolean }
+): Promise<ActionResult<V3EnemyItem>> {
+  if (!options?.skipAuth) {
+    await requireUser()
+  }
+
+  const cleanId = input.id?.trim()
+  const cleanName = input.name?.trim()
+  if (!cleanId) {
+    return fail("Brak ID wroga do edycji.")
+  }
+  if (!cleanName || cleanName.length < 2) {
+    return fail("Podaj prawidłowy nick wroga (min. 2 znaki).")
+  }
+
+  const db = await getDb()
+  const cleanGuild = input.guild?.trim() || null
+  const cleanClass = input.characterClass?.trim() || null
+
+  const [existing] = await db
+    .select()
+    .from(v3Enemies)
+    .where(eq(v3Enemies.id, cleanId))
+    .limit(1)
+
+  if (!existing) {
+    return fail("Nie znaleziono wroga o podanym ID.")
+  }
+
+  await db
+    .update(v3Enemies)
+    .set({
+      name: cleanName,
+      guild: cleanGuild,
+      characterClass: cleanClass,
+    })
+    .where(eq(v3Enemies.id, cleanId))
+
+  safeRevalidate()
+  return ok(`Zaktualizowano dane wroga „${cleanName}”!`, {
+    id: existing.id,
+    name: cleanName,
+    guild: cleanGuild,
+    characterClass: cleanClass,
+    isInsideV3: existing.isInsideV3,
+    spottedAt: existing.spottedAt ? new Date(existing.spottedAt).toISOString() : null,
+    spottedBy: existing.spottedBy,
+    createdAt: new Date(existing.createdAt).toISOString(),
+  })
+}
+
+/**
  * Permanently removes an enemy from the roster.
  */
 export async function deleteV3Enemy(enemyId: string, options?: { skipAuth?: boolean }): Promise<ActionResult> {
@@ -222,3 +278,4 @@ export async function deleteV3Enemy(enemyId: string, options?: { skipAuth?: bool
   safeRevalidate()
   return ok("Usunięto wroga z listy.")
 }
+

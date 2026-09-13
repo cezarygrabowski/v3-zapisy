@@ -6,6 +6,7 @@ import {
   getV3Enemies,
   quickAddV3Enemy,
   toggleV3EnemyStatus,
+  updateV3Enemy,
 } from "@/lib/actions/enemies"
 
 import { getDb } from "@/lib/db"
@@ -139,6 +140,47 @@ describe("V3 Enemy Radar Actions & Business Logic", () => {
     // Cleanup
     await deleteV3Enemy(res1.data!.id, { skipAuth: true })
     await deleteV3Enemy(res2.data!.id, { skipAuth: true })
+  })
+
+  test("updates enemy name, guild, and character class", async () => {
+    const origName = `EnemyToEdit_${Date.now()}`
+    const addRes = await quickAddV3Enemy(
+      {
+        name: origName,
+        guild: "OldGuild",
+        characterClass: "Wojownik",
+      },
+      testActor
+    )
+    assert.equal(addRes.ok, true)
+    const enemyId = addRes.data!.id
+
+    // Update enemy
+    const updatedName = `${origName}_Edited`
+    const updateRes = await updateV3Enemy(
+      {
+        id: enemyId,
+        name: updatedName,
+        guild: "NewGuild",
+        characterClass: "Ninja",
+      },
+      { skipAuth: true }
+    )
+
+    assert.equal(updateRes.ok, true)
+    assert.equal(updateRes.data?.name, updatedName)
+    assert.equal(updateRes.data?.guild, "NewGuild")
+    assert.equal(updateRes.data?.characterClass, "Ninja")
+
+    // Check DB fetch
+    const all = await getV3Enemies()
+    const found = all.find((e) => e.id === enemyId)
+    assert.equal(found?.name, updatedName)
+    assert.equal(found?.guild, "NewGuild")
+    assert.equal(found?.characterClass, "Ninja")
+
+    // Cleanup
+    await deleteV3Enemy(enemyId, { skipAuth: true })
   })
 
   test("returns error when toggling non-existent enemy ID", async () => {

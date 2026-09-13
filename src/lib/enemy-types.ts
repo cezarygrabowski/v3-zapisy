@@ -16,3 +16,11 @@ export type QuickAddEnemyInput = {
   characterClass?: string | null
   markInside?: boolean
 }
+
+export type UpdateEnemyInput = {
+  id: string
+  name: string
+  guild?: string | null
+  characterClass?: string | null
+}
+

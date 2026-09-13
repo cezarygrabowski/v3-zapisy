@@ -7,14 +7,23 @@ import {
   deleteV3Enemy,
   quickAddV3Enemy,
   toggleV3EnemyStatus,
+  updateV3Enemy,
 } from "@/lib/actions/enemies"
 import type { V3EnemyItem } from "@/lib/enemy-types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
-import { AlertTriangle, CheckCircle2, Plus, Search, ShieldAlert, Trash2, Users, X } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Pencil, Plus, Search, ShieldAlert, Trash2, Users, X } from "lucide-react"
 
 function formatMinutesAgo(isoDate: string | null): string {
   if (!isoDate) return ""
@@ -57,6 +66,19 @@ export function V3EnemyRadar({
   const [newGuild, setNewGuild] = useState("")
   const [newClass, setNewClass] = useState<string>("Wojownik")
   const [showAddForm, setShowAddForm] = useState(false)
+
+  // Edit dialog inputs
+  const [editingEnemy, setEditingEnemy] = useState<V3EnemyItem | null>(null)
+  const [editNick, setEditNick] = useState("")
+  const [editGuild, setEditGuild] = useState("")
+  const [editClass, setEditClass] = useState("Wojownik")
+
+  const handleOpenEdit = (enemy: V3EnemyItem) => {
+    setEditingEnemy(enemy)
+    setEditNick(enemy.name)
+    setEditGuild(enemy.guild || "")
+    setEditClass(enemy.characterClass || "Wojownik")
+  }
 
   // Keep local state in sync if initialEnemies change and no controlled state
   useEffect(() => {
@@ -184,6 +206,45 @@ export function V3EnemyRadar({
         updateEnemies(() => initialEnemies)
       } else {
         toast.success("Usunięto z listy.")
+      }
+    })
+  }
+
+  // Save edited enemy
+  const handleSaveEdit = () => {
+    if (!editingEnemy) return
+    const nick = editNick.trim()
+    if (!nick || nick.length < 2) {
+      toast.error("Podaj prawidłowy nick wroga (min. 2 znaki).")
+      return
+    }
+
+    const updatedEnemy: V3EnemyItem = {
+      ...editingEnemy,
+      name: nick,
+      guild: editGuild.trim() || null,
+      characterClass: editClass,
+    }
+
+    // Optimistic UI update
+    updateEnemies((prev) =>
+      prev.map((e) => (e.id === editingEnemy.id ? updatedEnemy : e))
+    )
+    setEditingEnemy(null)
+
+    startTransition(async () => {
+      const res = await updateV3Enemy({
+        id: editingEnemy.id,
+        name: nick,
+        guild: editGuild.trim() || undefined,
+        characterClass: editClass,
+      })
+
+      if (!res.ok) {
+        toast.error(res.error || "Błąd zapisu zmian wroga.")
+        updateEnemies(() => initialEnemies)
+      } else {
+        toast.success(res.message)
       }
     })
   }
@@ -463,21 +524,36 @@ export function V3EnemyRadar({
                       </div>
                     </button>
 
-                    {/* Delete button (leader only or hover) */}
-                    {isLeader ? (
+                    {/* Action buttons on hover: Edit & Delete */}
+                    <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity mr-1">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleDeleteEnemy(enemy.id, enemy.name)
+                          handleOpenEdit(enemy)
                         }}
                         disabled={pending}
-                        title="Usuń wroga z listy"
-                        className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-destructive transition-opacity mr-1"
+                        title="Edytuj dane wroga (nick, klasa, gildia)"
+                        className="p-1.5 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
                       >
-                        <Trash2 className="size-3" />
+                        <Pencil className="size-3" />
                       </button>
-                    ) : null}
+
+                      {isLeader ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteEnemy(enemy.id, enemy.name)
+                          }}
+                          disabled={pending}
+                          title="Usuń wroga z listy"
+                          className="p-1.5 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 )
               })}
@@ -485,6 +561,91 @@ export function V3EnemyRadar({
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Enemy Dialog */}
+      <Dialog
+        open={editingEnemy !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingEnemy(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Pencil className="size-4 text-primary" />
+              <span>Edytuj wroga</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Zmień nick, klasę postaci lub gildię wroga zapisanego w bazie radaru.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3 py-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold">Nick w grze *</label>
+              <Input
+                value={editNick}
+                onChange={(e) => setEditNick(e.target.value)}
+                placeholder="np. ShinsooSlayer"
+                className="h-8 text-xs"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveEdit()
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col gap-1.5 flex-1">
+                <label className="text-xs font-semibold">Klasa postaci</label>
+                <select
+                  value={editClass}
+                  onChange={(e) => setEditClass(e.target.value)}
+                  className="h-8 text-xs rounded-md border bg-background px-2.5 text-foreground"
+                >
+                  <option value="Wojownik">Wojownik</option>
+                  <option value="Ninja">Ninja</option>
+                  <option value="Sura">Sura</option>
+                  <option value="Szaman">Szaman</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5 flex-1">
+                <label className="text-xs font-semibold">Gildia (opcjonalnie)</label>
+                <Input
+                  value={editGuild}
+                  onChange={(e) => setEditGuild(e.target.value)}
+                  placeholder="np. Valhalla"
+                  className="h-8 text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveEdit()
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditingEnemy(null)}
+              className="text-xs h-8"
+            >
+              Anuluj
+            </Button>
+            <Button
+              size="sm"
+              disabled={pending || !editNick.trim()}
+              onClick={handleSaveEdit}
+              className="text-xs h-8 font-bold"
+            >
+              {pending ? <Spinner data-icon="inline-start" /> : null}
+              Zapisz zmiany
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
