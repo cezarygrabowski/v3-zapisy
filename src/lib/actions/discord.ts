@@ -127,7 +127,6 @@ export async function triggerEnemyAlertNotificationNow(): Promise<ActionResult> 
   const payload = buildEnemyAlertPayload({
     enemyName: "TestowyWróg (Test)",
     guild: "WrogowieGildii",
-    characterClass: "Wojownik",
     spotterNick: leader.gameNick,
     roleMention: config.enemyAlerts.roleMention,
   })

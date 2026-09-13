@@ -118,7 +118,6 @@ export async function toggleV3EnemyStatus(
     void notifyV3EnemySpotted({
       enemyName: enemy.name,
       guild: enemy.guild,
-      characterClass: enemy.characterClass,
       spotterNick,
     })
   }
@@ -182,7 +181,6 @@ export async function quickAddV3Enemy(
       void notifyV3EnemySpotted({
         enemyName: existing.name,
         guild: cleanGuild,
-        characterClass: cleanClass,
         spotterNick: userNick || "Ktoś z gildii",
       })
     }
@@ -206,7 +204,6 @@ export async function quickAddV3Enemy(
     void notifyV3EnemySpotted({
       enemyName: cleanName,
       guild: cleanGuild,
-      characterClass: cleanClass,
       spotterNick: userNick || "Ktoś z gildii",
     })
   }

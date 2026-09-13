@@ -56,7 +56,6 @@ describe("Discord Webhook & Configuration Logic", () => {
     const payload = buildEnemyAlertPayload({
       enemyName: "ShinsooSlayer",
       guild: "Valhalla",
-      characterClass: "Wojownik",
       spotterNick: "ProGamer",
       roleMention: "@here",
     })

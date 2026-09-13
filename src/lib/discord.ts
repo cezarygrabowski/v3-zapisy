@@ -297,20 +297,18 @@ export async function buildFeeReminderPayload(
 export function buildEnemyAlertPayload(params: {
   enemyName: string
   guild?: string | null
-  characterClass?: string | null
   spotterNick: string
   roleMention?: string
 }): DiscordWebhookPayload {
   const baseUrl = getAppBaseUrl()
   const mention = params.roleMention?.trim() ? `${params.roleMention.trim()} ` : ""
   const guildInfo = params.guild ? `[${params.guild}] ` : ""
-  const classInfo = params.characterClass ? ` (${params.characterClass})` : ""
 
   return {
     content: mention ? `${mention}🚨 **WRÓG W LOCHU PAJĄKÓW V3!**` : "🚨 **WRÓG W LOCHU PAJĄKÓW V3!**",
     embeds: [
       {
-        title: `⚔️ Wykryto wroga: ${guildInfo}${params.enemyName}${classInfo}`,
+        title: `⚔️ Wykryto wroga: ${guildInfo}${params.enemyName}`,
         description: `Gracz **${params.spotterNick}** właśnie zauważył wroga w komnacie V3!\n\nSprawdź [Radar Wrogów na Panelu V3](${baseUrl}/panel), aby monitorować sytuację.`,
         url: `${baseUrl}/panel`,
         color: 0xdc2626, // bright red
@@ -323,11 +321,6 @@ export function buildEnemyAlertPayload(params: {
           {
             name: "🛡️ Gildia",
             value: params.guild ? `**${params.guild}**` : "—",
-            inline: true,
-          },
-          {
-            name: "🏹 Klasa",
-            value: params.characterClass || "—",
             inline: true,
           },
           {
@@ -350,7 +343,6 @@ export function buildEnemyAlertPayload(params: {
 export async function notifyV3EnemySpotted(params: {
   enemyName: string
   guild?: string | null
-  characterClass?: string | null
   spotterNick: string
 }): Promise<void> {
   try {
