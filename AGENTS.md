@@ -24,3 +24,17 @@ Every time ANY database change is made (new table, new column, altered relation,
    - If `next dev` is running as a background task, you MUST restart it so it connects with the updated schema and drops stale cached instances.
 4. **Zero Assumptions**:
    - Never consider a database task complete until step 2 (remote DB verification) and step 3 (dev server restart) have succeeded.
+
+# Production Deployment Verification Protocol (Vercel)
+
+When pushing changes to `main` or verifying production deployments:
+1. **Target Project Context**:
+   - The production deployment is connected to project `elder-hub` (team: `fob5`), accessible at `https://elder-hub.vercel.app` (and alias `https://v3-zapisy.vercel.app`).
+2. **Checking Status via CLI**:
+   - List recent deployments: `npx vercel ls elder-hub`
+   - Inspect specific deployment status and build output: `npx vercel inspect <deployment-url-or-id>` (look for status: `● Ready`).
+   - Check live HTTP response: `curl -sI https://elder-hub.vercel.app`
+3. **Cron Job Limitations (Vercel Hobby Plan)**:
+   - On Vercel Hobby accounts, cron jobs are restricted to at most **once per day** (e.g. `"0 6 * * *"`).
+   - Any cron expression with higher frequency (e.g., hourly `"0 * * * *"`) will be rejected at deployment time by Vercel and fail the build. Always ensure `vercel.json` respects daily frequency.
+
