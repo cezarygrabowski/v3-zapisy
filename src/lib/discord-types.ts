@@ -13,10 +13,16 @@ export type DiscordFeeRemindersConfig = {
   lastSentWeek?: string // ISO week start "YYYY-MM-DD"
 }
 
+export type DiscordEnemyAlertsConfig = {
+  enabled: boolean
+  roleMention?: string // e.g. "@everyone", "@here", or "<@&123456789>"
+}
+
 export type DiscordConfig = {
   webhookUrl: string
   dailyEvents: DiscordDailyEventsConfig
   feeReminders: DiscordFeeRemindersConfig
+  enemyAlerts: DiscordEnemyAlertsConfig
 }
 
 export const SETTING_KEY_DISCORD_CONFIG = "discord_config"
@@ -34,4 +40,9 @@ export const DEFAULT_DISCORD_CONFIG: DiscordConfig = {
     time: "18:00",
     roleMention: "",
   },
+  enemyAlerts: {
+    enabled: true,
+    roleMention: "",
+  },
 }
+

@@ -230,6 +230,10 @@ export async function getDiscordConfig(): Promise<import("@/lib/discord-types").
         roleMention: parsed.feeReminders?.roleMention ?? DEFAULT_DISCORD_CONFIG.feeReminders.roleMention,
         lastSentWeek: parsed.feeReminders?.lastSentWeek,
       },
+      enemyAlerts: {
+        enabled: parsed.enemyAlerts?.enabled ?? DEFAULT_DISCORD_CONFIG.enemyAlerts.enabled,
+        roleMention: parsed.enemyAlerts?.roleMention ?? DEFAULT_DISCORD_CONFIG.enemyAlerts.roleMention,
+      },
     }
   } catch (err) {
     console.error("Failed to query discord config, using default:", err)

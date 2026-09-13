@@ -290,3 +290,85 @@ export async function buildFeeReminderPayload(
     ],
   }
 }
+
+/**
+ * Builds an enemy spotted alert payload for Discord.
+ */
+export function buildEnemyAlertPayload(params: {
+  enemyName: string
+  guild?: string | null
+  characterClass?: string | null
+  spotterNick: string
+  roleMention?: string
+}): DiscordWebhookPayload {
+  const baseUrl = getAppBaseUrl()
+  const mention = params.roleMention?.trim() ? `${params.roleMention.trim()} ` : ""
+  const guildInfo = params.guild ? `[${params.guild}] ` : ""
+  const classInfo = params.characterClass ? ` (${params.characterClass})` : ""
+
+  return {
+    content: mention ? `${mention}🚨 **WRÓG W LOCHU PAJĄKÓW V3!**` : "🚨 **WRÓG W LOCHU PAJĄKÓW V3!**",
+    embeds: [
+      {
+        title: `⚔️ Wykryto wroga: ${guildInfo}${params.enemyName}${classInfo}`,
+        description: `Gracz **${params.spotterNick}** właśnie zauważył wroga w komnacie V3!\n\nSprawdź [Radar Wrogów na Panelu V3](${baseUrl}/panel), aby monitorować sytuację.`,
+        url: `${baseUrl}/panel`,
+        color: 0xdc2626, // bright red
+        fields: [
+          {
+            name: "👤 Wróg",
+            value: `**${params.enemyName}**`,
+            inline: true,
+          },
+          {
+            name: "🛡️ Gildia",
+            value: params.guild ? `**${params.guild}**` : "—",
+            inline: true,
+          },
+          {
+            name: "🏹 Klasa",
+            value: params.characterClass || "—",
+            inline: true,
+          },
+          {
+            name: "👀 Zgłoszony przez",
+            value: params.spotterNick,
+            inline: true,
+          },
+        ],
+        footer: { text: "ElderHub • Radar Wrogów V3" },
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  }
+}
+
+/**
+ * Sends a background Discord notification when an enemy enters V3.
+ * Throttles/fails gracefully without throwing errors or blocking the caller.
+ */
+export async function notifyV3EnemySpotted(params: {
+  enemyName: string
+  guild?: string | null
+  characterClass?: string | null
+  spotterNick: string
+}): Promise<void> {
+  try {
+    const { getDiscordConfig } = await import("@/lib/settings")
+    const config = await getDiscordConfig()
+
+    if (!config.webhookUrl || !config.enemyAlerts?.enabled) {
+      return
+    }
+
+    const payload = buildEnemyAlertPayload({
+      ...params,
+      roleMention: config.enemyAlerts.roleMention,
+    })
+
+    await sendDiscordWebhook(config.webhookUrl, payload)
+  } catch (err) {
+    console.error("[discord] Error sending enemy spotted alert:", err)
+  }
+}
+

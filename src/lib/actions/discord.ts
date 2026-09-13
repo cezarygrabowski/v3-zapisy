@@ -111,3 +111,33 @@ export async function triggerFeeReminderNotificationNow(): Promise<ActionResult>
 
   return ok("Pomyślnie wysłano przypomnienie o składkach na Discord!")
 }
+
+/**
+ * Manually triggers a test Enemy Alert notification on Discord right now.
+ */
+export async function triggerEnemyAlertNotificationNow(): Promise<ActionResult> {
+  const leader = await requireLeader()
+
+  const config = await getDiscordConfig()
+  if (!config.webhookUrl) {
+    return fail("Najpierw skonfiguruj i zapisz adres Discord Webhook URL.")
+  }
+
+  const { buildEnemyAlertPayload } = await import("@/lib/discord")
+  const payload = buildEnemyAlertPayload({
+    enemyName: "TestowyWróg (Test)",
+    guild: "WrogowieGildii",
+    characterClass: "Wojownik",
+    spotterNick: leader.gameNick,
+    roleMention: config.enemyAlerts.roleMention,
+  })
+
+  const result = await sendDiscordWebhook(config.webhookUrl, payload)
+
+  if (!result.ok) {
+    return fail(result.error ?? "Błąd podczas wysyłania alertu na Discord.")
+  }
+
+  return ok("Pomyślnie wysłano próbny alert o wrogu na Discord!")
+}
+

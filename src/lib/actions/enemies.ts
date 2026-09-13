@@ -7,6 +7,7 @@ import { v3Enemies, users } from "@/lib/db/schema"
 import { requireUser, requireLeader } from "@/lib/session"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
 import type { QuickAddEnemyInput, UpdateEnemyInput, V3EnemyItem } from "@/lib/enemy-types"
+import { notifyV3EnemySpotted } from "@/lib/discord"
 
 function safeRevalidate() {
   try {
@@ -76,6 +77,8 @@ export async function toggleV3EnemyStatus(
     .select({
       id: v3Enemies.id,
       name: v3Enemies.name,
+      guild: v3Enemies.guild,
+      characterClass: v3Enemies.characterClass,
       isInsideV3: v3Enemies.isInsideV3,
     })
     .from(v3Enemies)
@@ -97,6 +100,28 @@ export async function toggleV3EnemyStatus(
       spottedBy: nextStatus ? userId : null,
     })
     .where(eq(v3Enemies.id, enemyId))
+
+  if (nextStatus) {
+    // Send Discord notification in background if enemy entered V3
+    let spotterNick = "Ktoś z gildii"
+    try {
+      const [u] = await db
+        .select({ gameNick: users.gameNick })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1)
+      if (u?.gameNick) spotterNick = u.gameNick
+    } catch {
+      // ignore
+    }
+
+    void notifyV3EnemySpotted({
+      enemyName: enemy.name,
+      guild: enemy.guild,
+      characterClass: enemy.characterClass,
+      spotterNick,
+    })
+  }
 
   safeRevalidate()
   return ok(
@@ -153,6 +178,13 @@ export async function quickAddV3Enemy(
           guild: cleanGuild || undefined,
         })
         .where(eq(v3Enemies.id, existing.id))
+
+      void notifyV3EnemySpotted({
+        enemyName: existing.name,
+        guild: cleanGuild,
+        characterClass: cleanClass,
+        spotterNick: userNick || "Ktoś z gildii",
+      })
     }
     safeRevalidate()
     return ok(`Wróg „${cleanName}” był już na liście. Zaktualizowano status!`)
@@ -169,6 +201,15 @@ export async function quickAddV3Enemy(
     spottedBy: markInside ? userId : null,
     createdAt: now,
   })
+
+  if (markInside) {
+    void notifyV3EnemySpotted({
+      enemyName: cleanName,
+      guild: cleanGuild,
+      characterClass: cleanClass,
+      spotterNick: userNick || "Ktoś z gildii",
+    })
+  }
 
   safeRevalidate()
   return ok(

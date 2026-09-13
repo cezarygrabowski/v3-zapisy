@@ -11,6 +11,7 @@ import { Spinner } from "@/components/ui/spinner"
 import {
   testDiscordWebhook,
   triggerDailyEventsNotificationNow,
+  triggerEnemyAlertNotificationNow,
   triggerFeeReminderNotificationNow,
   updateDiscordSettings,
 } from "@/lib/actions/discord"
@@ -20,6 +21,7 @@ import {
   Calendar,
   Coins,
   Send,
+  ShieldAlert,
   Sparkles,
   Check,
   AlertCircle,
@@ -45,6 +47,7 @@ export function AdminDiscordSettings({
   const [testPending, setTestPending] = useState(false)
   const [dailyPending, setDailyPending] = useState(false)
   const [feePending, setFeePending] = useState(false)
+  const [enemyPending, setEnemyPending] = useState(false)
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -101,6 +104,20 @@ export function AdminDiscordSettings({
       toast.success(res.message)
     } finally {
       setFeePending(false)
+    }
+  }
+
+  async function handleTriggerEnemyAlert() {
+    setEnemyPending(true)
+    try {
+      const res = await triggerEnemyAlertNotificationNow()
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+    } finally {
+      setEnemyPending(false)
     }
   }
 
@@ -366,6 +383,88 @@ export function AdminDiscordSettings({
                   <Coins className="mr-1.5 h-3.5 w-3.5 text-amber-500" />
                 )}
                 Wyślij przypomnienie o składkach teraz (Ręczny trigger)
+              </Button>
+            </div>
+          </div>
+
+          {/* Sekcja 3: Alerty o wrogach w V3 (Radar) */}
+          <div className="rounded-lg border p-4 flex flex-col gap-4 bg-background">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-red-500" />
+                <div>
+                  <h4 className="font-semibold text-sm">3. Alerty o wrogach w V3 (Radar na żywo)</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Gdy członek gildii oznaczy wroga na Radarze V3, bot natychmiast wyśle czerwony alert na kanał Discord.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={config.enemyAlerts?.enabled ?? true}
+                  onCheckedChange={(checked) =>
+                    setConfig({
+                      ...config,
+                      enemyAlerts: {
+                        ...(config.enemyAlerts || { roleMention: "" }),
+                        enabled: checked,
+                      },
+                    })
+                  }
+                />
+                <span className="text-xs font-medium">
+                  {(config.enemyAlerts?.enabled ?? true) ? "Włączone" : "Wyłączone"}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="enemy-role" className="text-xs">
+                  Wzmianka roli przy wrogu (opcjonalnie)
+                </Label>
+                <Input
+                  id="enemy-role"
+                  placeholder="@here, @everyone lub <@&ID_ROLI>"
+                  value={config.enemyAlerts?.roleMention ?? ""}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      enemyAlerts: {
+                        ...(config.enemyAlerts || { enabled: true }),
+                        roleMention: e.target.value,
+                      },
+                    })
+                  }
+                  disabled={!(config.enemyAlerts?.enabled ?? true)}
+                  className="text-xs font-mono"
+                />
+                <span className="text-[11px] text-muted-foreground">
+                  Zalecany: @here lub konkretna rola PvP / V3, aby zaalarmować graczy.
+                </span>
+              </div>
+
+              <div className="flex flex-col justify-between pt-1 sm:pt-0">
+                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-lg border">
+                  ⚡ <strong>Działanie natychmiastowe:</strong> Powiadomienie wysyłane jest w ułamku sekundy po 1-kliku na radarze przez dowolnego członka gildii.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleTriggerEnemyAlert}
+                disabled={enemyPending || !config.webhookUrl}
+              >
+                {enemyPending ? (
+                  <Spinner className="mr-1.5 h-3.5 w-3.5" />
+                ) : (
+                  <ShieldAlert className="mr-1.5 h-3.5 w-3.5 text-red-500" />
+                )}
+                Wyślij próbny alert o wrogu (Test na Discordzie)
               </Button>
             </div>
           </div>
