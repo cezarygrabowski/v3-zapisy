@@ -259,7 +259,7 @@ export function V3Map({
       )}
 
       <ul className="flex flex-wrap gap-2">
-        {MAP_ZONES.map((zone) => {
+        {MAP_ZONES.filter((zone) => zone.position !== "R2_R3_KORYTARZ").map((zone) => {
           const nick = nickByPosition.get(zone.position)
           const active = occupiedPositions.has(zone.position)
           const isMine = myPosition === zone.position
