@@ -1,10 +1,10 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, eq, ne, sql } from "drizzle-orm"
+import { and, eq, ilike, isNull, ne, or, sql } from "drizzle-orm"
 import { isPlaystyle } from "@/lib/constants"
 import { getDb, isUniqueViolation } from "@/lib/db"
-import { guildSettings, users } from "@/lib/db/schema"
+import { guildEventSignups, guildSettings, userCharacters, users } from "@/lib/db/schema"
 import { createPasswordUser, findUserById } from "@/lib/db/users"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
 import { hashPassword, parseLogin, parsePassword } from "@/lib/password"
@@ -46,8 +46,32 @@ export async function setPlaystyle(userId: string, playstyle: string): Promise<A
   if (!isPlaystyle(playstyle)) return fail("Wybierz PVP albo PVM.")
   const db = await getDb()
   await db.update(users).set({ playstyle }).where(eq(users.id, userId))
+
+  await db
+    .update(userCharacters)
+    .set({ playstyle: playstyle as "pvp" | "pvm" })
+    .where(and(eq(userCharacters.userId, userId), eq(userCharacters.isMain, true)))
+
+  await db
+    .update(guildEventSignups)
+    .set({
+      role: playstyle === "pvp" ? "PvP" : "PvM",
+    })
+    .where(
+      and(
+        eq(guildEventSignups.userId, userId),
+        or(
+          isNull(guildEventSignups.role),
+          ilike(guildEventSignups.role, "pvp"),
+          ilike(guildEventSignups.role, "pvm")
+        )
+      )
+    )
+
   revalidatePath("/", "layout")
   revalidatePath("/admin")
+  revalidatePath("/skladki")
+  revalidatePath("/statystyki")
   return ok()
 }
 

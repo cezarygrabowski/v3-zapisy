@@ -1,10 +1,10 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { eq } from "drizzle-orm"
+import { and, eq, ilike, isNull, or } from "drizzle-orm"
 import { isPlaystyle } from "@/lib/constants"
 import { getDb, isUniqueViolation } from "@/lib/db"
-import { users } from "@/lib/db/schema"
+import { guildEventSignups, userCharacters, users } from "@/lib/db/schema"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
 import { hashPassword, parseLogin, parsePassword } from "@/lib/password"
 import { requireUser } from "@/lib/session"
@@ -28,8 +28,37 @@ export async function updateProfile(input: {
     .set({ gameNick, playstyle: input.playstyle })
     .where(eq(users.id, user.id))
 
+  await db
+    .update(userCharacters)
+    .set({
+      name: gameNick,
+      playstyle: input.playstyle as "pvp" | "pvm",
+    })
+    .where(and(eq(userCharacters.userId, user.id), eq(userCharacters.isMain, true)))
+
+  await db
+    .update(guildEventSignups)
+    .set({
+      characterName: gameNick,
+      role: input.playstyle === "pvp" ? "PvP" : "PvM",
+    })
+    .where(
+      and(
+        eq(guildEventSignups.userId, user.id),
+        or(
+          isNull(guildEventSignups.role),
+          ilike(guildEventSignups.role, "pvp"),
+          ilike(guildEventSignups.role, "pvm")
+        )
+      )
+    )
+
   revalidatePath("/", "layout")
   revalidatePath("/konto")
+  revalidatePath("/kalendarz")
+  revalidatePath("/panel")
+  revalidatePath("/skladki")
+  revalidatePath("/statystyki")
   return ok()
 }
 

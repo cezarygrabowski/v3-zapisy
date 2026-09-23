@@ -1,9 +1,9 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, desc, eq, ne } from "drizzle-orm"
+import { and, desc, eq, ilike, isNull, ne, or } from "drizzle-orm"
 import { getDb } from "@/lib/db"
-import { userCharacters, users, type UserCharacter } from "@/lib/db/schema"
+import { guildEventSignups, userCharacters, users, type UserCharacter } from "@/lib/db/schema"
 import { requireUser } from "@/lib/session"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
 
@@ -181,9 +181,12 @@ export async function addCharacter(input: {
       .where(eq(users.id, user.id))
   }
 
+  revalidatePath("/", "layout")
   revalidatePath("/konto")
   revalidatePath("/kalendarz")
   revalidatePath("/panel")
+  revalidatePath("/skladki")
+  revalidatePath("/statystyki")
 
   return ok("Dodano postać.", {
     character: {
@@ -252,9 +255,51 @@ export async function updateCharacter(input: {
       .where(eq(users.id, user.id))
   }
 
+  // Update signups for this character
+  await db
+    .update(guildEventSignups)
+    .set({
+      characterName: name,
+      role: input.playstyle === "pvp" ? "PvP" : "PvM",
+    })
+    .where(
+      and(
+        eq(guildEventSignups.characterId, input.characterId),
+        or(
+          isNull(guildEventSignups.role),
+          ilike(guildEventSignups.role, "pvp"),
+          ilike(guildEventSignups.role, "pvm")
+        )
+      )
+    )
+
+  // If main, also update signups where characterId was not set (legacy/unlinked signups)
+  if (char.isMain) {
+    await db
+      .update(guildEventSignups)
+      .set({
+        characterName: name,
+        role: input.playstyle === "pvp" ? "PvP" : "PvM",
+      })
+      .where(
+        and(
+          eq(guildEventSignups.userId, user.id),
+          isNull(guildEventSignups.characterId),
+          or(
+            isNull(guildEventSignups.role),
+            ilike(guildEventSignups.role, "pvp"),
+            ilike(guildEventSignups.role, "pvm")
+          )
+        )
+      )
+  }
+
+  revalidatePath("/", "layout")
   revalidatePath("/konto")
   revalidatePath("/kalendarz")
   revalidatePath("/panel")
+  revalidatePath("/skladki")
+  revalidatePath("/statystyki")
 
   return ok("Zaktualizowano postać.")
 }
@@ -293,9 +338,12 @@ export async function setMainCharacter(input: { characterId: string }): Promise<
     .set({ gameNick: char.name, playstyle: char.playstyle })
     .where(eq(users.id, user.id))
 
+  revalidatePath("/", "layout")
   revalidatePath("/konto")
   revalidatePath("/kalendarz")
   revalidatePath("/panel")
+  revalidatePath("/skladki")
+  revalidatePath("/statystyki")
 
   return ok(`Ustawiono postać „${char.name}” jako główną.`)
 }
@@ -322,9 +370,12 @@ export async function deleteCharacter(input: { characterId: string }): Promise<A
 
   await db.delete(userCharacters).where(eq(userCharacters.id, input.characterId))
 
+  revalidatePath("/", "layout")
   revalidatePath("/konto")
   revalidatePath("/kalendarz")
   revalidatePath("/panel")
+  revalidatePath("/skladki")
+  revalidatePath("/statystyki")
 
   return ok(`Usunięto postać „${char.name}”.`)
 }

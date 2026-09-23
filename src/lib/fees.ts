@@ -10,6 +10,7 @@ export type FeeCharge = {
   userId: string
   gameNick: string
   playstyle: Playstyle | null
+  userPlaystyle?: Playstyle | null
   date: string
   slot: SlotId | string
   position: PositionId | string
@@ -122,10 +123,12 @@ export function buildFeeLedger(
     if (!user) {
       user = {
         gameNick: charge.gameNick,
-        playstyle: charge.playstyle,
+        playstyle: charge.userPlaystyle ?? charge.playstyle,
         weeks: new Map(),
       }
       byUser.set(charge.userId, user)
+    } else if (charge.userPlaystyle) {
+      user.playstyle = charge.userPlaystyle
     }
     const weekStart = weekStartForDate(charge.date)
     let week = user.weeks.get(weekStart)

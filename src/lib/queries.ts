@@ -17,6 +17,7 @@ import {
   runKills,
   runSyncs,
   signups,
+  userCharacters,
   users,
   type User,
 } from "@/lib/db/schema"
@@ -106,7 +107,8 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
       signupId: guildEventSignups.id,
       userId: users.id,
       gameNick: users.gameNick,
-      playstyle: users.playstyle,
+      userPlaystyle: users.playstyle,
+      characterPlaystyle: userCharacters.playstyle,
       eventDate: guildEvents.date,
       eventTitle: guildEvents.title,
       eventStartTime: guildEvents.startTime,
@@ -119,6 +121,7 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
     .from(guildEventSignups)
     .innerJoin(guildEvents, eq(guildEventSignups.eventId, guildEvents.id))
     .innerJoin(users, eq(guildEventSignups.userId, users.id))
+    .leftJoin(userCharacters, eq(guildEventSignups.characterId, userCharacters.id))
     .where(
       and(
         eq(guildEventSignups.attended, true),
@@ -127,13 +130,25 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
     )
 
   const charges: FeeCharge[] = chargeRows.map((row) => {
+    // Priority for fee calculation:
+    // 1. Current character's playstyle (if signup has characterId linked to userCharacters)
+    // 2. Current user's playstyle (from users table, synced with main character)
+    // 3. Fallback to signup role if explicitly 'pvp' or 'pvm'
+    // 4. Default to 'pvm'
     const playstyle = (
-      row.role?.toLowerCase() === "pvp"
+      (row.characterPlaystyle === "pvp" || row.characterPlaystyle === "pvm"
+        ? row.characterPlaystyle
+        : null) ??
+      (row.userPlaystyle === "pvp" || row.userPlaystyle === "pvm"
+        ? row.userPlaystyle
+        : null) ??
+      (row.role?.toLowerCase() === "pvp"
         ? "pvp"
         : row.role?.toLowerCase() === "pvm"
           ? "pvm"
-          : row.playstyle
-    ) as Playstyle | null
+          : null) ??
+      "pvm"
+    ) as Playstyle
 
     const feeKk = playstyle === "pvp" ? PVP_FEE_KK : PVM_FEE_KK
     const timeLabel = row.eventEndTime
@@ -144,6 +159,7 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
       userId: row.userId,
       gameNick: row.gameNick,
       playstyle,
+      userPlaystyle: (row.userPlaystyle as Playstyle | null) ?? playstyle,
       date: row.eventDate,
       slot: `${timeLabel} · ${row.eventTitle}`,
       position: (row.spot as PositionId) || row.role || "Uczestnik",
