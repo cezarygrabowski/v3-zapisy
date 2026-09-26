@@ -206,6 +206,30 @@ export function FeesPlayer({
           ) : null}
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={Boolean(offer)} onOpenChange={(open) => !open && setOffer(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Potwierdzenie wpłaty</AlertDialogTitle>
+            <AlertDialogDescription>
+              Zgłaszasz: {offer?.playerLabel ?? offer?.label} ({offer?.detail}). Admin zweryfikuje i potwierdzi wpłatę w grze.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!offer) return
+                const amountKk = offer.amountKk
+                setOffer(null)
+                report(amountKk)
+              }}
+            >
+              Zapłaciłem
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
