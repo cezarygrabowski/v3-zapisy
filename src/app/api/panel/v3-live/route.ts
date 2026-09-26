@@ -25,7 +25,7 @@ export async function GET() {
     // Parallel lightweight fetch
     const [v3Enemies, rawV3Event, kills, syncs] = await Promise.all([
       getV3Enemies(),
-      getRelevantV3CalendarEvent(),
+      getRelevantV3CalendarEvent(new Date(), user.id),
       listKillsForDate(date),
       listRunSyncs(),
     ])

@@ -123,6 +123,8 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
       spot: guildEventSignups.spot,
       role: guildEventSignups.role,
       hourIndex: guildEventSignups.hourIndex,
+      feeWaived: guildEvents.feeWaived,
+      feeWaivedReason: guildEvents.feeWaivedReason,
     })
     .from(guildEventSignups)
     .innerJoin(guildEvents, eq(guildEventSignups.eventId, guildEvents.id))
@@ -147,7 +149,8 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
           : "pvm"
     ) as Playstyle
 
-    const feeKk = playstyle === "pvp" ? PVP_FEE_KK : PVM_FEE_KK
+    const baseFeeKk = playstyle === "pvp" ? PVP_FEE_KK : PVM_FEE_KK
+    const feeKk = row.feeWaived ? 0 : baseFeeKk
     const timeLabel = row.eventEndTime
       ? `${row.eventStartTime}–${row.eventEndTime}`
       : row.eventStartTime
@@ -161,6 +164,8 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
       slot: `${timeLabel} · ${row.eventTitle}`,
       position: (row.spot as PositionId) || row.role || "Uczestnik",
       feeKk,
+      feeWaived: row.feeWaived,
+      feeWaivedReason: row.feeWaivedReason,
     }
   })
 

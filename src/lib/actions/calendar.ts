@@ -882,7 +882,7 @@ export async function getGuildEventModalDetails(eventId: string) {
   try {
     const user = await getCurrentUser()
     const { getGuildEventDetails } = await import("@/lib/calendar-queries")
-    const event = await getGuildEventDetails(eventId)
+    const event = await getGuildEventDetails(eventId, { currentUserId: user?.id })
     if (!event) return null
 
     if (event.type === "v3") {

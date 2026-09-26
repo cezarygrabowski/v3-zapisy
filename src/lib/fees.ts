@@ -16,6 +16,8 @@ export type FeeCharge = {
   slot: SlotId | string
   position: PositionId | string
   feeKk: number
+  feeWaived?: boolean
+  feeWaivedReason?: string | null
 }
 
 export type ConfirmedCredit = {
@@ -28,6 +30,8 @@ export type WeekEntry = {
   slot: SlotId | string
   position: PositionId | string
   feeKk: number
+  feeWaived?: boolean
+  feeWaivedReason?: string | null
 }
 
 export type WeekBalance = {
@@ -155,6 +159,8 @@ export function buildFeeLedger(
       slot: charge.slot,
       position: charge.position,
       feeKk: charge.feeKk,
+      feeWaived: charge.feeWaived,
+      feeWaivedReason: charge.feeWaivedReason,
     })
     week.chargedKk += charge.feeKk
   }

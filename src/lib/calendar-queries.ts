@@ -8,9 +8,17 @@ import {
   type GuildEventType,
 } from "@/lib/calendar-types"
 import { getDb } from "@/lib/db"
-import { guildEventAuditLogs, guildEventSignups, guildEvents, users } from "@/lib/db/schema"
+import {
+  guildEventAuditLogs,
+  guildEventEnemyReports,
+  guildEventSignups,
+  guildEvents,
+  users,
+} from "@/lib/db/schema"
 import { getExpeditionHourBlocks } from "@/lib/red-las"
 import { addDays, pad, todayInWarsaw, warsawMinutes } from "@/lib/dates"
+import { getCurrentUser } from "@/lib/session"
+import { calculateV3EnemyRaidStatus } from "@/lib/actions/v3-enemy-report"
 import { alias } from "drizzle-orm/pg-core"
 
 export * from "@/lib/calendar-types"
@@ -127,7 +135,10 @@ export async function listGuildEvents(options?: {
   })
 }
 
-export async function getGuildEventDetails(eventId: string): Promise<EventDetails | null> {
+export async function getGuildEventDetails(
+  eventId: string,
+  options?: { currentUserId?: string }
+): Promise<EventDetails | null> {
   const db = await getDb()
 
   const [event] = await db
@@ -145,6 +156,8 @@ export async function getGuildEventDetails(eventId: string): Promise<EventDetail
       maxParticipants: guildEvents.maxParticipants,
       description: guildEvents.description,
       status: guildEvents.status,
+      feeWaived: guildEvents.feeWaived,
+      feeWaivedReason: guildEvents.feeWaivedReason,
       createdById: guildEvents.createdBy,
       createdByNick: users.gameNick,
       createdAt: guildEvents.createdAt,
@@ -202,6 +215,33 @@ export async function getGuildEventDetails(eventId: string): Promise<EventDetail
     }))
     .sort((a, b) => a.gameNick.localeCompare(b.gameNick, "pl"))
 
+  let enemyReportStatus = undefined
+  if (event.type === "v3") {
+    const enemyReports = await db
+      .select({
+        userId: guildEventEnemyReports.userId,
+        createdAt: guildEventEnemyReports.createdAt,
+      })
+      .from(guildEventEnemyReports)
+      .where(eq(guildEventEnemyReports.eventId, eventId))
+
+    const resolvedUserId = options?.currentUserId ?? (await getCurrentUser().catch(() => null))?.id
+    const participantUserIds = new Set(signupsRows.map((s) => s.userId))
+
+    enemyReportStatus = await calculateV3EnemyRaidStatus({
+      event: {
+        date: event.date,
+        startTime: event.startTime,
+        feeWaived: event.feeWaived,
+        feeWaivedReason: event.feeWaivedReason,
+        type: event.type,
+      },
+      participantUserIds,
+      reports: enemyReports,
+      currentUserId: resolvedUserId,
+    })
+  }
+
   return {
     id: event.id,
     title: event.title,
@@ -221,6 +261,9 @@ export async function getGuildEventDetails(eventId: string): Promise<EventDetail
       event.startTime,
       event.durationHours
     ),
+    feeWaived: event.feeWaived,
+    feeWaivedReason: event.feeWaivedReason,
+    enemyReportStatus,
     createdById: event.createdById,
     createdByNick: event.createdByNick,
     createdAt: new Date(event.createdAt).toISOString(),
@@ -230,7 +273,7 @@ export async function getGuildEventDetails(eventId: string): Promise<EventDetail
   }
 }
 
-export async function getRelevantV3CalendarEvent(now = new Date()): Promise<EventDetails | null> {
+export async function getRelevantV3CalendarEvent(now = new Date(), currentUserId?: string): Promise<EventDetails | null> {
   const db = await getDb()
   const today = todayInWarsaw(now)
   const yesterday = addDays(today, -1)
@@ -308,7 +351,7 @@ export async function getRelevantV3CalendarEvent(now = new Date()): Promise<Even
     (c) => c.status === "active" || (currentTotalMins >= c.startTotalMins && currentTotalMins < c.endTotalMins)
   )
   if (activeCandidate) {
-    return getGuildEventDetails(activeCandidate.id)
+    return getGuildEventDetails(activeCandidate.id, { currentUserId })
   }
 
   // 2. Next upcoming planned event
@@ -317,7 +360,7 @@ export async function getRelevantV3CalendarEvent(now = new Date()): Promise<Even
     .sort((a, b) => a.startTotalMins - b.startTotalMins)
 
   if (upcomingCandidates.length > 0) {
-    return getGuildEventDetails(upcomingCandidates[0].id)
+    return getGuildEventDetails(upcomingCandidates[0].id, { currentUserId })
   }
 
   // 3. Most recently finished event
@@ -326,7 +369,7 @@ export async function getRelevantV3CalendarEvent(now = new Date()): Promise<Even
     .sort((a, b) => b.endTotalMins - a.endTotalMins)
 
   if (pastCandidates.length > 0) {
-    return getGuildEventDetails(pastCandidates[0].id)
+    return getGuildEventDetails(pastCandidates[0].id, { currentUserId })
   }
 
   return null

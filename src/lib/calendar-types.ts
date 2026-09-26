@@ -334,6 +334,9 @@ export type EventDetails = {
   }[]
   signups: EventSignupEntry[]
   allParticipants: { userId: string; gameNick: string; count: number; attendedCount: number }[]
+  feeWaived?: boolean
+  feeWaivedReason?: string | null
+  enemyReportStatus?: GuildEventEnemyReportStatus
   currentUserFeeLock?: UserFeeLockInfo
   currentUserPenalty?: UserPenaltyLockInfo | null
   currentUserCharacters?: {
@@ -348,6 +351,19 @@ export type EventDetails = {
   auditLogs?: GuildEventAuditLogEntry[]
 }
 
+export type GuildEventEnemyReportStatus = {
+  isWaived: boolean
+  feeWaivedReason: string | null
+  reportsCount: number
+  totalParticipants: number
+  thresholdPassed: boolean
+  userHasReported: boolean
+  canReport: boolean
+  windowStarted: boolean
+  windowExpired: boolean
+  deadlineIso: string | null
+}
+
 export type GuildEventAuditLogEntry = {
   id: string
   eventId: string
@@ -360,6 +376,8 @@ export type GuildEventAuditLogEntry = {
     | "edit"
     | "spot_transfer"
     | "yellow_card"
+    | "enemy_raid_reported"
+    | "fee_waived_toggled"
   actorId: string
   actorNick: string
   targetUserId: string | null

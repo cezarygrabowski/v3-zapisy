@@ -7,7 +7,7 @@ type AppDb = {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 } & ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>
 
-const SCHEMA_VERSION = 8
+const SCHEMA_VERSION = 9
 
 const globalForDb = globalThis as unknown as {
   dbPromise?: Promise<AppDb>
@@ -255,6 +255,16 @@ const SCHEMA_SQL = [
       spotted_at timestamptz,
       spotted_by text REFERENCES users(id),
       created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `ALTER TABLE guild_events ADD COLUMN IF NOT EXISTS fee_waived boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE guild_events ADD COLUMN IF NOT EXISTS fee_waived_reason text`,
+  `CREATE TABLE IF NOT EXISTS guild_event_enemy_reports (
+      id text PRIMARY KEY,
+      event_id text NOT NULL REFERENCES guild_events(id) ON DELETE CASCADE,
+      user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reason text NOT NULL DEFAULT 'nie da sie dropić, wróg na vce',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT guild_event_enemy_reports_unique UNIQUE (event_id, user_id)
     )`,
 ]
 

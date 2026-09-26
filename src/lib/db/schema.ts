@@ -335,6 +335,8 @@ export const guildEvents = pgTable("guild_events", {
   maxParticipants: integer("max_participants"),
   description: text("description"),
   status: text("status").notNull().default("planned"), // 'planned' | 'active' | 'finished' | 'cancelled'
+  feeWaived: boolean("fee_waived").notNull().default(false),
+  feeWaivedReason: text("fee_waived_reason"),
   createdBy: text("created_by")
     .notNull()
     .references(() => users.id),
@@ -360,6 +362,24 @@ export const guildEventSignups = pgTable(
     attended: boolean("attended").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   }
+)
+
+export const guildEventEnemyReports = pgTable(
+  "guild_event_enemy_reports",
+  {
+    id: text("id").primaryKey(),
+    eventId: text("event_id")
+      .notNull()
+      .references(() => guildEvents.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull().default("nie da sie dropić, wróg na vce"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("guild_event_enemy_reports_unique").on(table.eventId, table.userId),
+  ]
 )
 
 export const userCharactersRelations = relations(userCharacters, ({ one, many }) => ({
@@ -408,6 +428,18 @@ export const guildEventsRelations = relations(guildEvents, ({ one, many }) => ({
   }),
   signups: many(guildEventSignups),
   auditLogs: many(guildEventAuditLogs),
+  enemyReports: many(guildEventEnemyReports),
+}))
+
+export const guildEventEnemyReportsRelations = relations(guildEventEnemyReports, ({ one }) => ({
+  event: one(guildEvents, {
+    fields: [guildEventEnemyReports.eventId],
+    references: [guildEvents.id],
+  }),
+  user: one(users, {
+    fields: [guildEventEnemyReports.userId],
+    references: [users.id],
+  }),
 }))
 
 export const guildEventSignupsRelations = relations(guildEventSignups, ({ one }) => ({
@@ -524,6 +556,8 @@ export type CustomTimer = typeof customTimers.$inferSelect
 export type CustomTimerKill = typeof customTimerKills.$inferSelect
 export type GuildEvent = typeof guildEvents.$inferSelect
 export type GuildEventSignup = typeof guildEventSignups.$inferSelect
+export type GuildEventEnemyReport = typeof guildEventEnemyReports.$inferSelect
+export type NewGuildEventEnemyReport = typeof guildEventEnemyReports.$inferInsert
 export type GuildEventAuditLog = typeof guildEventAuditLogs.$inferSelect
 export type GuildSetting = typeof guildSettings.$inferSelect
 export type UserPenalty = typeof userPenalties.$inferSelect

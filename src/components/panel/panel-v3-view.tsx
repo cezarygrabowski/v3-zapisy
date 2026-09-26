@@ -20,6 +20,8 @@ import { BaronKillDialog } from "@/components/panel/baron-kill-dialog"
 import { SpotTransferDialog } from "@/components/calendar/spot-transfer-dialog"
 import { V3EnemyRadar } from "@/components/panel/v3-enemy-radar"
 import type { V3EnemyItem } from "@/lib/enemy-types"
+import { AlertTriangle, ShieldAlert } from "lucide-react"
+import { reportV3EnemyRaid, retractV3EnemyReport } from "@/lib/actions/v3-enemy-report"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -289,6 +291,30 @@ export function PanelV3View({
     })
   }
 
+  function handleReportEnemyRaid() {
+    if (!v3CalendarEvent) return
+    startTransition(async () => {
+      const res = await reportV3EnemyRaid({ eventId: v3CalendarEvent.id })
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+    })
+  }
+
+  function handleRetractEnemyReport() {
+    if (!v3CalendarEvent) return
+    startTransition(async () => {
+      const res = await retractV3EnemyReport({ eventId: v3CalendarEvent.id })
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+    })
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* V3 Calendar Event Header Banner */}
@@ -387,6 +413,79 @@ export function PanelV3View({
             </Button>
           </div>
         </div>
+
+        {/* Enemy Raid Alert & Fee Waiver Banner */}
+        {v3CalendarEvent ? (
+          v3CalendarEvent.feeWaived || v3CalendarEvent.enemyReportStatus?.isWaived ? (
+            <div className="flex items-start sm:items-center justify-between gap-3 bg-emerald-500/15 border border-emerald-500/35 text-emerald-950 dark:text-emerald-100 p-3 rounded-xl">
+              <div className="flex items-center gap-2.5">
+                <ShieldAlert className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <div>
+                  <div className="font-bold flex items-center gap-2 text-xs sm:text-sm">
+                    🛡️ Za ten slot nie pobieramy składki!
+                    <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-2 py-0.2 font-bold">
+                      0 kk
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {v3CalendarEvent.feeWaivedReason ||
+                      "Ponad 50% uczestników zgłosiło obecność wroga w ciągu 2 godzin od startu wydarzenia."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-amber-500/10 border border-amber-500/25 p-3 rounded-xl text-xs">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div>
+                  <span className="font-semibold text-foreground">Obecność wroga na lokacji:</span>
+                  <span className="text-muted-foreground ml-1.5">
+                    Zgłosiło:{" "}
+                    <strong className="text-foreground">
+                      {v3CalendarEvent.enemyReportStatus?.reportsCount ?? 0} /{" "}
+                      {v3CalendarEvent.enemyReportStatus?.totalParticipants ?? 0}
+                    </strong>
+                    {v3CalendarEvent.enemyReportStatus?.totalParticipants
+                      ? ` (${Math.round(
+                          ((v3CalendarEvent.enemyReportStatus.reportsCount ?? 0) /
+                            v3CalendarEvent.enemyReportStatus.totalParticipants) *
+                            100
+                        )}%)`
+                      : ""}
+                    {" • "}
+                    {v3CalendarEvent.enemyReportStatus?.windowExpired
+                      ? "Czas na zgłoszenie minął (wymagane w ciągu 2h od startu)."
+                      : "Wymagane >50% uczestników w ciągu 2h od startu, aby znieść składkę."}
+                  </span>
+                </div>
+              </div>
+
+              {myEventSignups.length > 0 && v3CalendarEvent.enemyReportStatus?.canReport ? (
+                v3CalendarEvent.enemyReportStatus.userHasReported ? (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="h-7 text-xs border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/15 shrink-0"
+                    disabled={pending}
+                    onClick={handleRetractEnemyReport}
+                  >
+                    ✓ Zgłoszono (kliknij, aby cofnąć)
+                  </Button>
+                ) : (
+                  <Button
+                    size="xs"
+                    className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold shadow-xs shrink-0"
+                    disabled={pending}
+                    onClick={handleReportEnemyRaid}
+                  >
+                    🚨 Nie da się dropić, wróg na vce
+                  </Button>
+                )
+              ) : null}
+            </div>
+          )
+        ) : null}
 
         {/* Quick Self Signup bar if an event exists */}
         {v3CalendarEvent ? (

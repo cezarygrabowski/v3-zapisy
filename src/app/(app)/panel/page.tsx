@@ -34,7 +34,7 @@ export default async function PanelPage() {
     listTimerCategoriesWithTimers(),
     hasV3 ? listKillStats(null) : Promise.resolve([]),
     listUsers(),
-    hasV3 ? getRelevantV3CalendarEvent() : Promise.resolve(null),
+    hasV3 ? getRelevantV3CalendarEvent(new Date(), user.id) : Promise.resolve(null),
     checkUserFeeLock(user.id),
     getSignupAdvanceDays(),
     getSignupOpenTime(),

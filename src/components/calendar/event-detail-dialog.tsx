@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react"
 import Link from "next/link"
-import { Check, Link2, Users, Crown, ChevronDown } from "lucide-react"
+import { Check, Link2, Users, Crown, ChevronDown, AlertTriangle, ShieldAlert } from "lucide-react"
 import { toast } from "sonner"
 import {
   deleteGuildEvent,
@@ -13,6 +13,11 @@ import {
   updateGuildEventStatus,
   withdrawFromGuildEvent,
 } from "@/lib/actions/calendar"
+import {
+  adminToggleFeeWaived,
+  reportV3EnemyRaid,
+  retractV3EnemyReport,
+} from "@/lib/actions/v3-enemy-report"
 import {
   EVENT_COLORS,
   EVENT_TYPE_METADATA,
@@ -136,6 +141,45 @@ export function EventDetailDialog({
       .catch((err) => {
         console.error("Failed to refresh event details:", err)
       })
+  }
+
+  function handleReportEnemyRaid() {
+    if (!event) return
+    startTransition(async () => {
+      const res = await reportV3EnemyRaid({ eventId: event.id })
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+      refreshDetails()
+    })
+  }
+
+  function handleRetractEnemyReport() {
+    if (!event) return
+    startTransition(async () => {
+      const res = await retractV3EnemyReport({ eventId: event.id })
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+      refreshDetails()
+    })
+  }
+
+  function handleToggleFeeWaived(waived: boolean) {
+    if (!event) return
+    startTransition(async () => {
+      const res = await adminToggleFeeWaived({ eventId: event.id, waived })
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+      refreshDetails()
+    })
   }
 
   function handleSpotSignUp(spotId: string, role?: string, characterId?: string) {
@@ -724,6 +768,103 @@ export function EventDetailDialog({
                   </div>
                 ) : event.type === "v3" ? (
                   <div className="flex flex-col gap-4">
+                    {/* Enemy Raid Alert & Fee Waiver Section */}
+                    {event.feeWaived || event.enemyReportStatus?.isWaived ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-emerald-500/15 border border-emerald-500/35 text-emerald-950 dark:text-emerald-100 p-3.5 rounded-xl">
+                        <div className="flex items-center gap-2.5">
+                          <ShieldAlert className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          <div>
+                            <div className="font-bold flex items-center gap-2 text-sm">
+                              🛡️ Za ten slot nie pobieramy składki!
+                              <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-2 py-0.5 font-bold">
+                                0 kk
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {event.feeWaivedReason ||
+                                "Ponad 50% uczestników zgłosiło obecność wroga w ciągu 2 godzin od rozpoczęcia wydarzenia."}
+                            </p>
+                          </div>
+                        </div>
+
+                        {isLeader ? (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="text-xs border-emerald-500/40 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/20 shrink-0 self-end sm:self-auto"
+                            disabled={pending}
+                            onClick={() => handleToggleFeeWaived(false)}
+                          >
+                            Przywróć składkę
+                          </Button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-amber-500/10 border border-amber-500/25 p-3 rounded-xl text-xs">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                          <div>
+                            <span className="font-semibold text-foreground">Obecność wroga na lokacji:</span>
+                            <span className="text-muted-foreground ml-1.5">
+                              Zgłosiło:{" "}
+                              <strong className="text-foreground">
+                                {event.enemyReportStatus?.reportsCount ?? 0} /{" "}
+                                {event.enemyReportStatus?.totalParticipants ?? 0}
+                              </strong>
+                              {event.enemyReportStatus?.totalParticipants
+                                ? ` (${Math.round(
+                                    ((event.enemyReportStatus.reportsCount ?? 0) /
+                                      event.enemyReportStatus.totalParticipants) *
+                                      100
+                                  )}%)`
+                                : ""}
+                              {" • "}
+                              {event.enemyReportStatus?.windowExpired
+                                ? "Czas na zgłoszenie minął (wymagane w ciągu 2h od startu)."
+                                : "Wymagane >50% uczestników w ciągu 2h od startu, aby znieść składkę."}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                          {mySignups.length > 0 && event.enemyReportStatus?.canReport ? (
+                            event.enemyReportStatus.userHasReported ? (
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                className="h-7 text-xs border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/15 shrink-0"
+                                disabled={pending}
+                                onClick={handleRetractEnemyReport}
+                              >
+                                ✓ Zgłoszono (kliknij, aby cofnąć)
+                              </Button>
+                            ) : (
+                              <Button
+                                size="xs"
+                                className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold shadow-xs shrink-0"
+                                disabled={pending}
+                                onClick={handleReportEnemyRaid}
+                              >
+                                🚨 Nie da się dropić, wróg na vce
+                              </Button>
+                            )
+                          ) : null}
+
+                          {isLeader ? (
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              className="h-7 text-xs border-muted-foreground/30 hover:bg-muted shrink-0"
+                              disabled={pending}
+                              onClick={() => handleToggleFeeWaived(true)}
+                            >
+                              Znieś składkę (lider)
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+
                     {/* V3 Spots Occupancy Status */}
                     <div className="flex items-center justify-between bg-muted/40 border rounded-xl px-3.5 py-2.5 text-xs">
                       <div className="flex items-center gap-2">
