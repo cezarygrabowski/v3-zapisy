@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, ne } from "drizzle-orm"
+import { and, desc, eq, gte, ilike, inArray, ne } from "drizzle-orm"
 import {
   POSITIONS,
   PVM_FEE_KK,
@@ -130,6 +130,7 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
     .leftJoin(userCharacters, eq(guildEventSignups.characterId, userCharacters.id))
     .where(
       and(
+        ilike(guildEvents.type, "v3"),
         eq(guildEventSignups.attended, true),
         ne(guildEvents.status, "cancelled")
       )

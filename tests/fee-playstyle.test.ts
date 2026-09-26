@@ -257,4 +257,62 @@ describe("Fee calculation recalculates for previous week on character playstyle 
     assert.equal(state.currentWeekRemainingKk, PVP_FEE_KK)
     assert.ok(state.toDateWeeks.some((w) => w.weekStart === weekStartInWarsaw(new Date())))
   })
+
+  test("non-V3 events (e.g. dungeon, boss, other) are free and not included in fees", async () => {
+    const db = await getDb()
+    const dungeonEventId = `dungeon-event-${Date.now()}`
+    const bossEventId = `boss-event-${Date.now()}`
+    const today = todayInWarsaw(new Date())
+
+    await db.insert(guildEvents).values({
+      id: dungeonEventId,
+      title: "Dungeon Expedition",
+      type: "dungeon",
+      date: today,
+      startTime: "18:00",
+      endTime: "19:00",
+      createdBy: userId,
+      status: "finished",
+    })
+
+    await db.insert(guildEventSignups).values({
+      id: `dungeon-signup-${Date.now()}`,
+      eventId: dungeonEventId,
+      userId,
+      characterId: charId,
+      spot: "R1",
+      role: "PvP",
+      attended: true,
+    })
+
+    await db.insert(guildEvents).values({
+      id: bossEventId,
+      title: "Boss Hunt",
+      type: "boss",
+      date: previousWeekDate,
+      startTime: "12:00",
+      endTime: "13:00",
+      createdBy: userId,
+      status: "finished",
+    })
+
+    await db.insert(guildEventSignups).values({
+      id: `boss-signup-${Date.now()}`,
+      eventId: bossEventId,
+      userId,
+      characterId: charId,
+      spot: "R1",
+      role: "PvP",
+      attended: true,
+    })
+
+    const ledger = await getFeeLedger()
+    const state = ledger.get(userId)
+    assert.ok(state, "User fee state should exist")
+
+    // The amounts should be exactly the same as before because dungeon and boss are free!
+    assert.equal(state.overdueKk, 3 * PVP_FEE_KK, "overdueKk should NOT count non-v3 boss event")
+    assert.equal(state.toDateKk, 4 * PVP_FEE_KK, "toDateKk should NOT count non-v3 dungeon or boss events")
+    assert.equal(state.currentWeekRemainingKk, PVP_FEE_KK, "currentWeekRemainingKk should NOT count dungeon event")
+  })
 })
