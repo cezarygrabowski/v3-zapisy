@@ -257,8 +257,10 @@ export function emptyFeeState(userId: string, gameNick: string, playstyle: Plays
     gameNick,
     playstyle,
     overdueKk: 0,
+    toDateKk: 0,
     currentWeekRemainingKk: 0,
     overdueWeeks: [],
+    toDateWeeks: [],
     currentWeek: null,
     settledWeeks: [],
     previousWeek: {

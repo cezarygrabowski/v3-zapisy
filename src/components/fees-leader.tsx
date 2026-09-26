@@ -83,24 +83,24 @@ export function FeesLeader({
   const previousWeekLabel =
     states.find((row) => row.previousWeek?.label)?.previousWeek.label ?? "Poprzedni tydzień"
 
-  // All-time calculations
+  // All-time (to date, including current week) calculations
   const allOwing = useMemo(() => {
     return states
-      .filter((row) => row.overdueKk > 0)
+      .filter((row) => row.toDateKk > 0)
       .sort(
         (a, b) =>
-          b.overdueKk - a.overdueKk ||
+          b.toDateKk - a.toDateKk ||
           a.gameNick.localeCompare(b.gameNick, "pl")
       )
   }, [states])
 
   const allClear = useMemo(() => {
     return states
-      .filter((row) => row.overdueKk === 0)
+      .filter((row) => row.toDateKk === 0)
       .sort((a, b) => a.gameNick.localeCompare(b.gameNick, "pl"))
   }, [states])
 
-  const allTotalKk = allOwing.reduce((sum, row) => sum + row.overdueKk, 0)
+  const allTotalKk = allOwing.reduce((sum, row) => sum + row.toDateKk, 0)
 
   // Search filter
   const needle = query.trim().toLocaleLowerCase("pl")
@@ -290,9 +290,9 @@ export function FeesLeader({
           <section className="flex flex-col gap-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="font-heading text-lg font-semibold">Wszystkie zaległe składki</h2>
+                <h2 className="font-heading text-lg font-semibold">Do zebrania do tej pory</h2>
                 <p className="text-sm text-muted-foreground">
-                  {allOwing.length} {personWord(allOwing.length)} · {allTotalKk} kk
+                  {allOwing.length} {personWord(allOwing.length)} · {allTotalKk} kk (z aktualnym tygodniem)
                 </p>
               </div>
               <Input
@@ -313,7 +313,7 @@ export function FeesLeader({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Gracz</TableHead>
-                    <TableHead>Zaległe</TableHead>
+                    <TableHead>Do tej pory</TableHead>
                     <TableHead>Tygodnie</TableHead>
                     <TableHead />
                   </TableRow>
@@ -338,8 +338,8 @@ export function FeesLeader({
                             ) : null}
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">{row.overdueKk} kk</TableCell>
-                        <TableCell>{row.overdueWeeks.length}</TableCell>
+                        <TableCell className="font-medium">{row.toDateKk} kk</TableCell>
+                        <TableCell>{row.toDateWeeks.length}</TableCell>
                         <TableCell className="text-right">
                           <Button size="sm" disabled={waiting} onClick={() => setCollect(row)}>
                             Zapłacił
@@ -350,10 +350,10 @@ export function FeesLeader({
                         <TableRow>
                           <TableCell colSpan={4}>
                             <div className="flex flex-col gap-3 py-1">
-                              {row.overdueWeeks.map((week) => (
+                              {row.toDateWeeks.map((week) => (
                                 <div key={week.weekStart} className="flex flex-col gap-1">
                                   <p className="text-sm font-medium">
-                                    {week.label} · {week.remainingKk} kk · {week.entries.length}{" "}
+                                    {week.closed ? week.label : `${week.label} (ten tydzień)`} · {week.remainingKk} kk · {week.entries.length}{" "}
                                     {entryWord(week.entries.length)}
                                   </p>
                                   <WeekEntries entries={week.entries} />
@@ -373,7 +373,7 @@ export function FeesLeader({
           {allClear.length > 0 ? (
             <details className="rounded-xl bg-card ring-1 ring-foreground/10">
               <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
-                Na zero ({allClear.length})
+                Na zero do tej pory ({allClear.length})
               </summary>
               <ul className="flex flex-col gap-1 px-4 pb-4 text-sm text-muted-foreground">
                 {allClear
@@ -382,9 +382,6 @@ export function FeesLeader({
                   .map((row) => (
                     <li key={row.userId}>
                       {row.gameNick}
-                      {row.currentWeekRemainingKk > 0
-                        ? ` · ten tydzień ${row.currentWeekRemainingKk} kk`
-                        : ""}
                     </li>
                   ))}
               </ul>

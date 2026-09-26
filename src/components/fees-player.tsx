@@ -142,9 +142,9 @@ export function FeesPlayer({
         <TabsContent value="all" className="flex flex-col gap-6 pt-2">
           <Card>
             <CardHeader>
-              <CardDescription>Zaległe składki (zamknięte tygodnie)</CardDescription>
+              <CardDescription>Składki do tej pory (z bieżącym tygodniem)</CardDescription>
               <CardTitle className="font-heading text-3xl">
-                {state.overdueKk > 0 ? `${state.overdueKk} kk` : "Nic nie zalegasz"}
+                {state.toDateKk > 0 ? `${state.toDateKk} kk` : "Nic nie zalegasz"}
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
@@ -154,7 +154,7 @@ export function FeesPlayer({
                 </p>
               ) : offers.length > 0 ? (
                 <div className="flex flex-col gap-2">
-                  <p className="text-sm text-muted-foreground">Nie liczymy aktualnego tygodnia.</p>
+                  <p className="text-sm text-muted-foreground">Wybierz kwotę do opłacenia:</p>
                   <div className="flex flex-wrap gap-2">
                     {offers.map((item, index) => {
                       const isPrimary = index === offers.length - 1
@@ -176,25 +176,18 @@ export function FeesPlayer({
             </CardContent>
           </Card>
 
-          {state.overdueWeeks.length > 0 ? (
+          {state.toDateWeeks.length > 0 ? (
             <section className="flex flex-col gap-2">
-              <h2 className="font-heading text-lg font-semibold">Poprzednie tygodnie</h2>
-              {state.overdueWeeks.map((week) => (
+              <h2 className="font-heading text-lg font-semibold">Tygodnie do rozliczenia</h2>
+              {state.toDateWeeks.map((week) => (
                 <WeekRow
                   key={week.weekStart}
-                  label={week.label}
+                  label={week.closed ? week.label : `${week.label} (ten tydzień)`}
                   remainingKk={week.remainingKk}
                   entries={week.entries}
                 />
               ))}
             </section>
-          ) : null}
-
-          {state.currentWeek ? (
-            <p className="text-sm text-muted-foreground">
-              Ten tydzień (trwa): {state.currentWeekRemainingKk} kk · {state.currentWeek.entries.length}{" "}
-              {entryWord(state.currentWeek.entries.length)}
-            </p>
           ) : null}
 
           {state.settledWeeks.length > 0 ? (

@@ -45,8 +45,10 @@ export type UserFeeState = {
   gameNick: string
   playstyle: Playstyle | null
   overdueKk: number
+  toDateKk: number
   currentWeekRemainingKk: number
   overdueWeeks: WeekBalance[]
+  toDateWeeks: WeekBalance[]
   currentWeek: WeekBalance | null
   settledWeeks: WeekBalance[]
   previousWeek: WeekBalance
@@ -62,27 +64,28 @@ export type PaymentOffer = {
 }
 
 export function paymentOffers(state: UserFeeState): PaymentOffer[] {
-  if (state.overdueKk <= 0) return []
+  if (state.toDateKk <= 0) return []
   const offers: PaymentOffer[] = []
   let running = 0
-  const last = state.overdueWeeks.length - 1
-  const isSingle = state.overdueWeeks.length === 1
+  const last = state.toDateWeeks.length - 1
+  const isSingle = state.toDateWeeks.length === 1
 
-  for (let i = 0; i < state.overdueWeeks.length; i++) {
-    const week = state.overdueWeeks[i]
+  for (let i = 0; i < state.toDateWeeks.length; i++) {
+    const week = state.toDateWeeks[i]
     running += week.remainingKk
-    const isAll = i === last && state.overdueWeeks.length > 1
-    const title = isSingle ? "Zapłaciłem" : isAll ? "Zapłaciłem całość" : week.label
+    const isAll = i === last && state.toDateWeeks.length > 1
+    const weekTitle = week.closed ? week.label : `${week.label} (ten tydzień)`
+    const title = isSingle ? "Zapłaciłem" : isAll ? "Zapłaciłem całość" : weekTitle
     const playerLabel = isSingle
       ? `Zapłaciłem · ${running} kk`
       : isAll
         ? `Zapłaciłem całość · ${running} kk`
-        : `Zapłaciłem: ${week.label} · ${running} kk`
+        : `Zapłaciłem: ${weekTitle} · ${running} kk`
     const leaderLabel = isSingle
       ? `Zapłacił · ${running} kk`
       : isAll
         ? `Zapłacił całość · ${running} kk`
-        : `Zapłacił: ${week.label} · ${running} kk`
+        : `Zapłacił: ${weekTitle} · ${running} kk`
 
     offers.push({
       amountKk: running,
@@ -91,10 +94,10 @@ export function paymentOffers(state: UserFeeState): PaymentOffer[] {
       playerLabel,
       leaderLabel,
       detail: isAll || isSingle
-        ? `Wszystkie zaległe tygodnie (${running} kk)`
+        ? `Wszystkie składki do tej pory (${running} kk)`
         : i === 0
-          ? "Najstarszy zaległy tydzień"
-          : `Od najstarszego do ${week.label}`,
+          ? `Najstarszy tydzień (${weekTitle})`
+          : `Od najstarszego do ${weekTitle}`,
     })
   }
   return offers
@@ -173,6 +176,7 @@ export function buildFeeLedger(
     }
 
     const overdueWeeks = weeks.filter((week) => week.closed && week.remainingKk > 0)
+    const toDateWeeks = weeks.filter((week) => week.remainingKk > 0)
     const settledWeeks = weeks.filter((week) => week.closed && week.remainingKk === 0)
     const currentWeek = weeks.find((week) => week.weekStart === currentWeekStart) ?? null
     const previousWeekStart = addDays(currentWeekStart, -7)
@@ -191,8 +195,10 @@ export function buildFeeLedger(
       gameNick: user.gameNick,
       playstyle: user.playstyle,
       overdueKk: overdueWeeks.reduce((sum, week) => sum + week.remainingKk, 0),
+      toDateKk: toDateWeeks.reduce((sum, week) => sum + week.remainingKk, 0),
       currentWeekRemainingKk: currentWeek?.remainingKk ?? 0,
       overdueWeeks,
+      toDateWeeks,
       currentWeek,
       settledWeeks,
       previousWeek,

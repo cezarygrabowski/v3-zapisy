@@ -4,7 +4,7 @@ import { getDb } from "@/lib/db"
 import { guildEvents, guildEventSignups, userCharacters, users } from "@/lib/db/schema"
 import { getFeeLedger } from "@/lib/queries"
 import { PVM_FEE_KK, PVP_FEE_KK } from "@/lib/constants"
-import { addDays, weekStartInWarsaw } from "@/lib/dates"
+import { addDays, todayInWarsaw, weekStartInWarsaw } from "@/lib/dates"
 import { eq } from "drizzle-orm"
 
 describe("Fee calculation recalculates for previous week on character playstyle change", () => {
@@ -218,5 +218,43 @@ describe("Fee calculation recalculates for previous week on character playstyle 
     const fridayEntry = week.entries.find((e) => e.date === previousWeekDate && e.position === "PRAWO")
     assert.ok(fridayEntry, "Friday entry should be found")
     assert.equal(fridayEntry.feeKk, PVP_FEE_KK, "Friday entry should be 3 kk because user profile is PVP")
+  })
+
+  test("toDateKk includes current week entries while overdueKk only counts closed weeks", async () => {
+    const db = await getDb()
+    const currentWeekEventId = `cur-event-${Date.now()}`
+    const today = todayInWarsaw(new Date())
+
+    await db.insert(guildEvents).values({
+      id: currentWeekEventId,
+      title: "Current Week V3",
+      type: "v3",
+      date: today,
+      startTime: "14:30",
+      endTime: "17:30",
+      createdBy: userId,
+      status: "finished",
+    })
+
+    await db.insert(guildEventSignups).values({
+      id: `cur-signup-${Date.now()}`,
+      eventId: currentWeekEventId,
+      userId,
+      characterId: charId,
+      spot: "R2",
+      role: "PvP",
+      attended: true,
+    })
+
+    const ledger = await getFeeLedger()
+    const state = ledger.get(userId)
+    assert.ok(state, "User fee state should exist")
+
+    // The user had 3 events in previous week (3 * 3 kk = 9 kk)
+    assert.equal(state.overdueKk, 3 * PVP_FEE_KK, "overdueKk should NOT include current week")
+    // toDateKk must include previous week (9 kk) + current week (3 kk) = 12 kk
+    assert.equal(state.toDateKk, 4 * PVP_FEE_KK, "toDateKk MUST include current week entries")
+    assert.equal(state.currentWeekRemainingKk, PVP_FEE_KK)
+    assert.ok(state.toDateWeeks.some((w) => w.weekStart === weekStartInWarsaw(new Date())))
   })
 })
