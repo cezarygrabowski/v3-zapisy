@@ -70,6 +70,8 @@ describe("Fee calculation recalculates for previous week on character playstyle 
     assert.equal(state.overdueKk, PVM_FEE_KK)
     assert.equal(state.overdueWeeks.length, 1)
     assert.equal(state.overdueWeeks[0].chargedKk, PVM_FEE_KK)
+    assert.equal(state.previousWeek.remainingKk, PVM_FEE_KK)
+    assert.equal(state.previousWeek.entries.length, 1)
   })
 
   test("recalculates previous week fee as PVP (3 kk) when character playstyle changes to pvp", async () => {
@@ -95,6 +97,7 @@ describe("Fee calculation recalculates for previous week on character playstyle 
       "Fee should be recalculated to 3 kk for the previous week"
     )
     assert.equal(state.overdueWeeks[0].chargedKk, PVP_FEE_KK)
+    assert.equal(state.previousWeek.remainingKk, PVP_FEE_KK)
   })
 
   test("recalculates back to PVM (7 kk) when character playstyle changes back to pvm", async () => {
@@ -164,5 +167,56 @@ describe("Fee calculation recalculates for previous week on character playstyle 
     assert.ok(state, "User fee state should exist")
     // 2 events * 3 kk = 6 kk
     assert.equal(state.overdueKk, 2 * PVP_FEE_KK)
+  })
+
+  test("uses user profile playstyle (users.playstyle) even if signup was marked PvM and character was PvM", async () => {
+    const db = await getDb()
+    const altCharId = `alt-char-${Date.now()}`
+    const altEventId = `alt-event-${Date.now()}`
+
+    // Insert an alt character that is pvm
+    await db.insert(userCharacters).values({
+      id: altCharId,
+      userId,
+      name: `AltChar_${Date.now()}`,
+      playstyle: "pvm",
+      isMain: false,
+    })
+
+    // Insert an event where signup role was PvM and character was pvm
+    await db.insert(guildEvents).values({
+      id: altEventId,
+      title: "V3 Friday",
+      type: "v3",
+      date: previousWeekDate,
+      startTime: "08:30",
+      endTime: "11:30",
+      createdBy: userId,
+      status: "finished",
+    })
+
+    await db.insert(guildEventSignups).values({
+      id: `alt-signup-${Date.now()}`,
+      eventId: altEventId,
+      userId,
+      characterId: altCharId,
+      spot: "PRAWO",
+      role: "PvM",
+      attended: true,
+    })
+
+    // Profile playstyle is PVP
+    await db.update(users).set({ playstyle: "pvp" }).where(eq(users.id, userId))
+
+    const ledger = await getFeeLedger()
+    const state = ledger.get(userId)
+    assert.ok(state, "User fee state should exist")
+
+    // The Friday event entry must be charged at 3 kk (PVP_FEE_KK), NOT 7 kk!
+    const week = state.overdueWeeks.find((w) => w.weekStart === previousWeekDate)
+    assert.ok(week, "Previous week should be found")
+    const fridayEntry = week.entries.find((e) => e.date === previousWeekDate && e.position === "PRAWO")
+    assert.ok(fridayEntry, "Friday entry should be found")
+    assert.equal(fridayEntry.feeKk, PVP_FEE_KK, "Friday entry should be 3 kk because user profile is PVP")
   })
 })

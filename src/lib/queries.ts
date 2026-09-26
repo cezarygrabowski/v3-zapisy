@@ -8,6 +8,12 @@ import {
   type PositionId,
   type SlotId,
 } from "@/lib/constants"
+import {
+  addDays,
+  formatWeekRangePl,
+  weekEndForStart,
+  weekStartInWarsaw,
+} from "@/lib/dates"
 import { getDb } from "@/lib/db"
 import {
   feePayments,
@@ -130,24 +136,14 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
     )
 
   const charges: FeeCharge[] = chargeRows.map((row) => {
-    // Priority for fee calculation:
-    // 1. Current character's playstyle (if signup has characterId linked to userCharacters)
-    // 2. Current user's playstyle (from users table, synced with main character)
-    // 3. Fallback to signup role if explicitly 'pvp' or 'pvm'
-    // 4. Default to 'pvm'
+    // Current user playstyle from profile (users.playstyle).
+    // It takes the current value from the profile (pvp/pvm) regardless of what was marked at signup.
     const playstyle = (
-      (row.characterPlaystyle === "pvp" || row.characterPlaystyle === "pvm"
-        ? row.characterPlaystyle
-        : null) ??
-      (row.userPlaystyle === "pvp" || row.userPlaystyle === "pvm"
+      row.userPlaystyle === "pvp" || row.userPlaystyle === "pvm"
         ? row.userPlaystyle
-        : null) ??
-      (row.role?.toLowerCase() === "pvp"
-        ? "pvp"
-        : row.role?.toLowerCase() === "pvm"
-          ? "pvm"
-          : null) ??
-      "pvm"
+        : row.characterPlaystyle === "pvp" || row.characterPlaystyle === "pvm"
+          ? row.characterPlaystyle
+          : "pvm"
     ) as Playstyle
 
     const feeKk = playstyle === "pvp" ? PVP_FEE_KK : PVM_FEE_KK
@@ -255,6 +251,7 @@ export async function listPaymentHistory(limit = 20): Promise<FeePaymentHistoryI
 }
 
 export function emptyFeeState(userId: string, gameNick: string, playstyle: Playstyle | null): UserFeeState {
+  const prevStart = addDays(weekStartInWarsaw(), -7)
   return {
     userId,
     gameNick,
@@ -264,6 +261,15 @@ export function emptyFeeState(userId: string, gameNick: string, playstyle: Plays
     overdueWeeks: [],
     currentWeek: null,
     settledWeeks: [],
+    previousWeek: {
+      weekStart: prevStart,
+      weekEnd: weekEndForStart(prevStart),
+      label: formatWeekRangePl(prevStart),
+      closed: true,
+      entries: [],
+      chargedKk: 0,
+      remainingKk: 0,
+    },
   }
 }
 

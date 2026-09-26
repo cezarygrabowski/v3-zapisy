@@ -25,7 +25,7 @@ export default async function FeesPage() {
       <div className="flex flex-col gap-6">
         <Header
           title="Składki"
-          description="Zaległe z poprzednich tygodni. Bieżący tydzień nalicza się do niedzieli."
+          description="Rozliczenia składek za wyprawy. Wybierz widok poprzedniego tygodnia lub całości."
         />
         <FeesPlayer state={state} pending={myPending} />
       </div>
@@ -33,22 +33,17 @@ export default async function FeesPage() {
   }
 
   const states = [...ledger.values()]
-  const owing = states
-    .filter((row) => row.overdueKk > 0)
-    .sort((a, b) => b.overdueKk - a.overdueKk || a.gameNick.localeCompare(b.gameNick, "pl"))
-  const clear = states.filter((row) => row.overdueKk === 0)
   const history = await listPaymentHistory()
 
   return (
     <div className="flex flex-col gap-6">
       <Header
         title="Składki"
-        description="Zgłoszenia na górze, zbiórka poniżej. Propozycje spłaty schodzą od najstarszego tygodnia."
+        description="Zgłoszenia i zbiórka składek. Wybierz widok poprzedniego tygodnia lub całości."
       />
       <FeesLeader
         pending={pending}
-        owing={owing}
-        clear={clear}
+        states={states}
         history={history}
         canSeed={isDevLoginEnabled()}
       />

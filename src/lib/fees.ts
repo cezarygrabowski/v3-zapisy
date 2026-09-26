@@ -1,5 +1,6 @@
 import { type Playstyle, type PositionId, type SlotId } from "@/lib/constants"
 import {
+  addDays,
   formatWeekRangePl,
   weekEndForStart,
   weekStartForDate,
@@ -48,6 +49,7 @@ export type UserFeeState = {
   overdueWeeks: WeekBalance[]
   currentWeek: WeekBalance | null
   settledWeeks: WeekBalance[]
+  previousWeek: WeekBalance
 }
 
 export type PaymentOffer = {
@@ -173,6 +175,16 @@ export function buildFeeLedger(
     const overdueWeeks = weeks.filter((week) => week.closed && week.remainingKk > 0)
     const settledWeeks = weeks.filter((week) => week.closed && week.remainingKk === 0)
     const currentWeek = weeks.find((week) => week.weekStart === currentWeekStart) ?? null
+    const previousWeekStart = addDays(currentWeekStart, -7)
+    const previousWeek = weeks.find((week) => week.weekStart === previousWeekStart) ?? {
+      weekStart: previousWeekStart,
+      weekEnd: weekEndForStart(previousWeekStart),
+      label: formatWeekRangePl(previousWeekStart),
+      closed: true,
+      entries: [],
+      chargedKk: 0,
+      remainingKk: 0,
+    }
 
     result.set(userId, {
       userId,
@@ -183,6 +195,7 @@ export function buildFeeLedger(
       overdueWeeks,
       currentWeek,
       settledWeeks,
+      previousWeek,
     })
   }
 
