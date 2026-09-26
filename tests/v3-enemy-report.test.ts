@@ -18,7 +18,7 @@ describe("V3 Enemy Raid & Fee Waiver Business Rules", () => {
       type: "v3",
     }
 
-    test("recognizes window start and 2-hour expiration", async () => {
+    test("allows reporting throughout event and checks 2-hour fee waiver expiration", async () => {
       const participants = new Set(["u1", "u2", "u3", "u4", "u5", "u6", "u7"])
 
       // Before start (17:50)
@@ -45,20 +45,34 @@ describe("V3 Enemy Raid & Fee Waiver Business Rules", () => {
       })
       assert.equal(statusDuring.windowStarted, true)
       assert.equal(statusDuring.windowExpired, false)
+      assert.equal(statusDuring.waiverWindowExpired, false)
       assert.equal(statusDuring.canReport, true)
 
-      // After 2-hour deadline (20:30 Warsaw, 2.5 hours in)
-      const afterDeadline = new Date("2026-09-26T18:30:00Z") // 20:30 Warsaw (UTC+2)
-      const statusAfter = await calculateV3EnemyRaidStatus({
+      // Last hour (20:30 Warsaw, 2.5 hours in, event lasts 3h until 21:00)
+      const lastHour = new Date("2026-09-26T18:30:00Z") // 20:30 Warsaw (UTC+2)
+      const statusLastHour = await calculateV3EnemyRaidStatus({
         event: baseEvent,
         participantUserIds: participants,
         reports: [],
         currentUserId: "u1",
-        now: afterDeadline,
+        now: lastHour,
       })
-      assert.equal(statusAfter.windowStarted, true)
-      assert.equal(statusAfter.windowExpired, true)
-      assert.equal(statusAfter.canReport, false)
+      assert.equal(statusLastHour.windowStarted, true)
+      assert.equal(statusLastHour.windowExpired, false) // Event still in progress!
+      assert.equal(statusLastHour.waiverWindowExpired, true) // 2h waiver window passed!
+      assert.equal(statusLastHour.canReport, true) // Can still report enemy!
+
+      // After event end (21:10 Warsaw, >3h)
+      const afterEnd = new Date("2026-09-26T19:10:00Z") // 21:10 Warsaw (UTC+2)
+      const statusAfterEnd = await calculateV3EnemyRaidStatus({
+        event: baseEvent,
+        participantUserIds: participants,
+        reports: [],
+        currentUserId: "u1",
+        now: afterEnd,
+      })
+      assert.equal(statusAfterEnd.windowExpired, true)
+      assert.equal(statusAfterEnd.canReport, false)
     })
 
     test("only registered participants can report", async () => {
@@ -149,8 +163,10 @@ describe("V3 Enemy Raid & Fee Waiver Business Rules", () => {
 
       // Only u1 and u2 are qualified -> 2 out of 4 = 50% (not > 50%) -> thresholdPassed = false
       assert.equal(status.reportsCount, 2)
+      assert.equal(status.totalReportsCount, 3)
       assert.equal(status.totalParticipants, 4)
       assert.equal(status.thresholdPassed, false)
+      assert.equal(status.isWaived, false)
     })
   })
 

@@ -355,13 +355,16 @@ export type GuildEventEnemyReportStatus = {
   isWaived: boolean
   feeWaivedReason: string | null
   reportsCount: number
+  totalReportsCount: number
   totalParticipants: number
   thresholdPassed: boolean
   userHasReported: boolean
   canReport: boolean
   windowStarted: boolean
   windowExpired: boolean
+  waiverWindowExpired: boolean
   deadlineIso: string | null
+  eventEndIso: string | null
 }
 
 export type GuildEventAuditLogEntry = {

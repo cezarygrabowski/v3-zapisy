@@ -27,6 +27,8 @@ export async function calculateV3EnemyRaidStatus({
   event: {
     date: string
     startTime: string
+    endTime?: string | null
+    durationHours?: number | null
     feeWaived: boolean
     feeWaivedReason: string | null
     type: string
@@ -38,22 +40,39 @@ export async function calculateV3EnemyRaidStatus({
 }): Promise<GuildEventEnemyReportStatus> {
   const hms = event.startTime.length === 5 ? `${event.startTime}:00` : event.startTime
   const startDate = warsawWallToDate(event.date, hms)
-  const deadlineDate = startDate ? new Date(startDate.getTime() + 2 * 60 * 60 * 1000) : null
+  const waiverDeadlineDate = startDate ? new Date(startDate.getTime() + 2 * 60 * 60 * 1000) : null
+
+  let durationHours = event.durationHours || 3
+  if (event.startTime && event.endTime) {
+    const { calculateDurationHours } = await import("@/lib/calendar-types")
+    durationHours = calculateDurationHours(event.startTime, event.endTime)
+  }
+  const eventEndDate = startDate ? new Date(startDate.getTime() + durationHours * 60 * 60 * 1000) : null
 
   const nowMs = now.getTime()
   const windowStarted = startDate ? nowMs >= startDate.getTime() : false
-  const windowExpired = deadlineDate ? nowMs > deadlineDate.getTime() : false
+  const eventExpired = eventEndDate ? nowMs > eventEndDate.getTime() : false
+  const waiverWindowExpired = waiverDeadlineDate ? nowMs > waiverDeadlineDate.getTime() : false
 
-  // Qualified reports: submitted by registered participants within [startDate, deadlineDate]
+  // Qualified reports: submitted by registered participants within [startDate, waiverDeadlineDate] (first 2h)
   const qualifiedReports = reports.filter((r) => {
     if (!participantUserIds.has(r.userId)) return false
-    if (!startDate || !deadlineDate) return false
+    if (!startDate || !waiverDeadlineDate) return false
     const rTime = new Date(r.createdAt).getTime()
-    return rTime >= startDate.getTime() && rTime <= deadlineDate.getTime()
+    return rTime >= startDate.getTime() && rTime <= waiverDeadlineDate.getTime()
+  })
+
+  // All event reports: submitted by registered participants anytime during the event
+  const allEventReports = reports.filter((r) => {
+    if (!participantUserIds.has(r.userId)) return false
+    if (!startDate) return false
+    const rTime = new Date(r.createdAt).getTime()
+    return rTime >= startDate.getTime() && (!eventEndDate || rTime <= eventEndDate.getTime())
   })
 
   const totalParticipants = participantUserIds.size
   const reportsCount = qualifiedReports.length
+  const totalReportsCount = allEventReports.length
   const thresholdPassed = totalParticipants > 0 && reportsCount / totalParticipants > 0.5
 
   const userHasReported = Boolean(
@@ -65,7 +84,7 @@ export async function calculateV3EnemyRaidStatus({
     event.type === "v3" &&
     isUserParticipant &&
     windowStarted &&
-    !windowExpired
+    !eventExpired
   )
 
   const isWaived = event.feeWaived || thresholdPassed
@@ -74,15 +93,18 @@ export async function calculateV3EnemyRaidStatus({
     isWaived,
     feeWaivedReason:
       event.feeWaivedReason ??
-      (thresholdPassed ? "Wróg na V3 (ponad 50% zgłoszeń uczestników w ciągu 2h)" : null),
+      (thresholdPassed ? "Wróg na V3 (ponad 50% zgłoszeń uczestników w ciągu pierwszych 2h)" : null),
     reportsCount,
+    totalReportsCount,
     totalParticipants,
     thresholdPassed,
     userHasReported,
     canReport,
     windowStarted,
-    windowExpired,
-    deadlineIso: deadlineDate ? deadlineDate.toISOString() : null,
+    windowExpired: eventExpired,
+    waiverWindowExpired,
+    deadlineIso: waiverDeadlineDate ? waiverDeadlineDate.toISOString() : null,
+    eventEndIso: eventEndDate ? eventEndDate.toISOString() : null,
   }
 }
 
@@ -100,6 +122,8 @@ export async function reportV3EnemyRaid(input: {
       type: guildEvents.type,
       date: guildEvents.date,
       startTime: guildEvents.startTime,
+      endTime: guildEvents.endTime,
+      durationHours: guildEvents.durationHours,
       feeWaived: guildEvents.feeWaived,
       feeWaivedReason: guildEvents.feeWaivedReason,
     })
@@ -120,17 +144,23 @@ export async function reportV3EnemyRaid(input: {
     return { ok: false, error: "Nieprawidłowa data lub godzina rozpoczęcia wydarzenia." }
   }
 
+  let durationHours = event.durationHours || 3
+  if (event.startTime && event.endTime) {
+    const { calculateDurationHours } = await import("@/lib/calendar-types")
+    durationHours = calculateDurationHours(event.startTime, event.endTime)
+  }
+  const eventEndDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000)
+
   const now = new Date()
-  const deadlineDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000)
 
   if (now.getTime() < startDate.getTime()) {
     return { ok: false, error: "Zgłoszenie wroga jest możliwe dopiero po rozpoczęciu wydarzenia." }
   }
 
-  if (now.getTime() > deadlineDate.getTime()) {
+  if (now.getTime() > eventEndDate.getTime()) {
     return {
       ok: false,
-      error: "Minęły ponad 2 godziny od rozpoczęcia wydarzenia – czas na zgłoszenie wroga minął.",
+      error: "Wydarzenie zostało już zakończone – czas na zgłaszanie wroga minął.",
     }
   }
 
@@ -187,7 +217,7 @@ export async function reportV3EnemyRaid(input: {
       .update(guildEvents)
       .set({
         feeWaived: true,
-        feeWaivedReason: "Wróg na V3 (ponad 50% zgłoszeń uczestników w ciągu 2h)",
+        feeWaivedReason: "Wróg na V3 (ponad 50% zgłoszeń uczestników w ciągu pierwszych 2h)",
       })
       .where(eq(guildEvents.id, input.eventId))
 
@@ -200,7 +230,7 @@ export async function reportV3EnemyRaid(input: {
         targetUserId: null,
         spot: null,
         role: null,
-        reason: "Próg >50% zgłoszeń w ciągu 2h",
+        reason: "Próg >50% zgłoszeń w pierwszych 2h",
         details: `${status.reportsCount}/${status.totalParticipants} zgłoszeń - składka zniesiona`,
       })
     } catch (logErr) {
@@ -212,6 +242,12 @@ export async function reportV3EnemyRaid(input: {
   revalidatePath("/kalendarz")
   revalidatePath("/skladki")
 
+  const message = status.isWaived
+    ? "Zgłoszono obecność wroga. Ponad 50% uczestników zgłosiło problem w pierwszych 2h – za ten slot nie pobieramy składki!"
+    : status.waiverWindowExpired
+      ? `Zgłoszono obecność wroga (${status.totalReportsCount}/${status.totalParticipants} uczestników). Zgłoszenie w ostatniej godzinie informuje o problemie, ale nie zwalnia ze składki.`
+      : `Zgłoszono obecność wroga (${status.reportsCount}/${status.totalParticipants} uczestników). Wymagane ponad 50% w ciągu pierwszych 2h, aby znieść składkę.`
+
   return {
     ok: true,
     data: {
@@ -219,9 +255,7 @@ export async function reportV3EnemyRaid(input: {
       reportsCount: status.reportsCount,
       totalParticipants: status.totalParticipants,
     },
-    message: status.isWaived
-      ? "Zgłoszono obecność wroga. Ponad 50% uczestników zgłosiło problem – za ten slot nie pobieramy składki!"
-      : `Zgłoszono obecność wroga (${status.reportsCount}/${status.totalParticipants} uczestników). Wymagane ponad 50% w ciągu 2h, aby znieść składkę.`,
+    message,
   }
 }
 
@@ -238,6 +272,8 @@ export async function retractV3EnemyReport(input: {
       type: guildEvents.type,
       date: guildEvents.date,
       startTime: guildEvents.startTime,
+      endTime: guildEvents.endTime,
+      durationHours: guildEvents.durationHours,
       feeWaived: guildEvents.feeWaived,
       feeWaivedReason: guildEvents.feeWaivedReason,
     })

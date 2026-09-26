@@ -429,10 +429,33 @@ export function PanelV3View({
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {v3CalendarEvent.feeWaivedReason ||
-                      "Ponad 50% uczestników zgłosiło obecność wroga w ciągu 2 godzin od startu wydarzenia."}
+                      "Ponad 50% uczestników zgłosiło obecność wroga w ciągu pierwszych 2 godzin wydarzenia."}
                   </p>
                 </div>
               </div>
+
+              {myEventSignups.length > 0 && v3CalendarEvent.enemyReportStatus?.canReport ? (
+                v3CalendarEvent.enemyReportStatus.userHasReported ? (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="h-7 text-xs border-emerald-500/40 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/20 shrink-0"
+                    disabled={pending}
+                    onClick={handleRetractEnemyReport}
+                  >
+                    ✓ Zgłoszono (kliknij, aby cofnąć)
+                  </Button>
+                ) : (
+                  <Button
+                    size="xs"
+                    className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold shadow-xs shrink-0"
+                    disabled={pending}
+                    onClick={handleReportEnemyRaid}
+                  >
+                    🚨 Wróg na vce
+                  </Button>
+                )
+              ) : null}
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-amber-500/10 border border-amber-500/25 p-3 rounded-xl text-xs">
@@ -443,20 +466,18 @@ export function PanelV3View({
                   <span className="text-muted-foreground ml-1.5">
                     Zgłosiło:{" "}
                     <strong className="text-foreground">
-                      {v3CalendarEvent.enemyReportStatus?.reportsCount ?? 0} /{" "}
+                      {v3CalendarEvent.enemyReportStatus?.totalReportsCount ?? 0} /{" "}
                       {v3CalendarEvent.enemyReportStatus?.totalParticipants ?? 0}
                     </strong>
-                    {v3CalendarEvent.enemyReportStatus?.totalParticipants
-                      ? ` (${Math.round(
-                          ((v3CalendarEvent.enemyReportStatus.reportsCount ?? 0) /
-                            v3CalendarEvent.enemyReportStatus.totalParticipants) *
-                            100
-                        )}%)`
-                      : ""}
-                    {" • "}
-                    {v3CalendarEvent.enemyReportStatus?.windowExpired
-                      ? "Czas na zgłoszenie minął (wymagane w ciągu 2h od startu)."
-                      : "Wymagane >50% uczestników w ciągu 2h od startu, aby znieść składkę."}
+                    {v3CalendarEvent.enemyReportStatus?.waiverWindowExpired ? (
+                      <span className="text-muted-foreground">
+                        {" • "}Trwa ostatnia godzina wydarzenia (zgłoszenie informuje o wrogu, ale nie anuluje składki).
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {" • "}Zgłoszone w pierwszych 2h: <strong>{v3CalendarEvent.enemyReportStatus?.reportsCount ?? 0}</strong> (wymagane &gt;50% do zniesienia składki).
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>

@@ -782,22 +782,47 @@ export function EventDetailDialog({
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
                               {event.feeWaivedReason ||
-                                "Ponad 50% uczestników zgłosiło obecność wroga w ciągu 2 godzin od rozpoczęcia wydarzenia."}
+                                "Ponad 50% uczestników zgłosiło obecność wroga w ciągu pierwszych 2 godzin wydarzenia."}
                             </p>
                           </div>
                         </div>
 
-                        {isLeader ? (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            className="text-xs border-emerald-500/40 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/20 shrink-0 self-end sm:self-auto"
-                            disabled={pending}
-                            onClick={() => handleToggleFeeWaived(false)}
-                          >
-                            Przywróć składkę
-                          </Button>
-                        ) : null}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                          {mySignups.length > 0 && event.enemyReportStatus?.canReport ? (
+                            event.enemyReportStatus.userHasReported ? (
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                className="h-7 text-xs border-emerald-500/40 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/20 shrink-0"
+                                disabled={pending}
+                                onClick={handleRetractEnemyReport}
+                              >
+                                ✓ Zgłoszono (kliknij, aby cofnąć)
+                              </Button>
+                            ) : (
+                              <Button
+                                size="xs"
+                                className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold shadow-xs shrink-0"
+                                disabled={pending}
+                                onClick={handleReportEnemyRaid}
+                              >
+                                🚨 Wróg na vce
+                              </Button>
+                            )
+                          ) : null}
+
+                          {isLeader ? (
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              className="text-xs border-emerald-500/40 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/20 shrink-0"
+                              disabled={pending}
+                              onClick={() => handleToggleFeeWaived(false)}
+                            >
+                              Przywróć składkę
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
                     ) : (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-amber-500/10 border border-amber-500/25 p-3 rounded-xl text-xs">
@@ -808,20 +833,18 @@ export function EventDetailDialog({
                             <span className="text-muted-foreground ml-1.5">
                               Zgłosiło:{" "}
                               <strong className="text-foreground">
-                                {event.enemyReportStatus?.reportsCount ?? 0} /{" "}
+                                {event.enemyReportStatus?.totalReportsCount ?? 0} /{" "}
                                 {event.enemyReportStatus?.totalParticipants ?? 0}
                               </strong>
-                              {event.enemyReportStatus?.totalParticipants
-                                ? ` (${Math.round(
-                                    ((event.enemyReportStatus.reportsCount ?? 0) /
-                                      event.enemyReportStatus.totalParticipants) *
-                                      100
-                                  )}%)`
-                                : ""}
-                              {" • "}
-                              {event.enemyReportStatus?.windowExpired
-                                ? "Czas na zgłoszenie minął (wymagane w ciągu 2h od startu)."
-                                : "Wymagane >50% uczestników w ciągu 2h od startu, aby znieść składkę."}
+                              {event.enemyReportStatus?.waiverWindowExpired ? (
+                                <span className="text-muted-foreground">
+                                  {" • "}Trwa ostatnia godzina wydarzenia (zgłoszenie informuje o wrogu, ale nie anuluje składki).
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">
+                                  {" • "}Zgłoszone w pierwszych 2h: <strong>{event.enemyReportStatus?.reportsCount ?? 0}</strong> (wymagane &gt;50% do zniesienia składki).
+                                </span>
+                              )}
                             </span>
                           </div>
                         </div>

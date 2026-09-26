@@ -232,6 +232,8 @@ export async function getGuildEventDetails(
       event: {
         date: event.date,
         startTime: event.startTime,
+        endTime: event.endTime,
+        durationHours: event.durationHours,
         feeWaived: event.feeWaived,
         feeWaivedReason: event.feeWaivedReason,
         type: event.type,
