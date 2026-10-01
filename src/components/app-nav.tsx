@@ -6,9 +6,11 @@ import { logout } from "@/lib/actions/auth"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { useAlerts } from "@/components/alerts-provider"
 
 const LINKS = [
   { href: "/panel", label: "⚔️ Panel" },
+  { href: "/alerty", label: "Alerty" },
   { href: "/kalendarz", label: "📅 Kalendarz" },
   { href: "/skladki", label: "Składki" },
   { href: "/statystyki", label: "Statystyki" },
@@ -26,6 +28,8 @@ export function AppNav({
   pendingPayments?: number
 }) {
   const pathname = usePathname()
+  const { timers, now } = useAlerts()
+  const readyAlerts = timers.filter((timer) => timer.readyAt <= now).length
   const links = isLeader
     ? [...LINKS, { href: "/admin", label: "Admin" }]
     : LINKS
@@ -52,6 +56,11 @@ export function AppNav({
                 )}
               >
                 {link.label}
+                {link.href === "/alerty" && readyAlerts > 0 ? (
+                  <Badge aria-label={`${readyAlerts} gotowych alertów`} className="ml-1.5">
+                    {readyAlerts}
+                  </Badge>
+                ) : null}
                 {link.href === "/skladki" && pendingPayments > 0 ? (
                   <Badge variant="secondary" className="ml-1.5">
                     {pendingPayments}

@@ -7,7 +7,7 @@ type AppDb = {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 } & ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>
 
-const SCHEMA_VERSION = 9
+const SCHEMA_VERSION = 10
 
 const globalForDb = globalThis as unknown as {
   dbPromise?: Promise<AppDb>
@@ -240,6 +240,16 @@ const SCHEMA_SQL = [
       created_at timestamptz NOT NULL DEFAULT now()
     )`,
   `ALTER TABLE guild_event_signups ADD COLUMN IF NOT EXISTS character_id text REFERENCES user_characters(id) ON DELETE SET NULL`,
+  `CREATE TABLE IF NOT EXISTS personal_timers (
+      id text PRIMARY KEY,
+      user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      character_id text REFERENCES user_characters(id) ON DELETE SET NULL,
+      name text NOT NULL,
+      interval_minutes integer NOT NULL CHECK (interval_minutes BETWEEN 1 AND 525600),
+      last_completed_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `CREATE INDEX IF NOT EXISTS personal_timers_user_id_idx ON personal_timers(user_id)`,
   `ALTER TABLE guild_event_signups ADD COLUMN IF NOT EXISTS character_name text`,
   `INSERT INTO user_characters (id, user_id, name, playstyle, is_main, created_at)
       SELECT id, id, game_nick, COALESCE(playstyle, 'pvm'), true, now()

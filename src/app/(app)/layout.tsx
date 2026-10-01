@@ -1,5 +1,7 @@
 import type { ReactNode } from "react"
 import { AppNav } from "@/components/app-nav"
+import { AlertsProvider } from "@/components/alerts-provider"
+import { listPersonalTimers } from "@/lib/personal-timers"
 import { ImpersonationBanner } from "@/components/impersonation-banner"
 import { VerificationPendingView } from "@/components/verification-pending-view"
 import { countPendingPayments } from "@/lib/queries"
@@ -20,9 +22,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   const impState = await getImpersonationState()
   const pendingPayments = user.isLeader ? await countPendingPayments() : 0
+  const timers = await listPersonalTimers(user.id)
+  const initialNow = new Date().getTime()
 
   return (
-    <>
+    <AlertsProvider key={user.id} timers={timers} initialNow={initialNow}>
       {impState.isImpersonating && impState.realUser && impState.impersonatedUser ? (
         <ImpersonationBanner
           realNick={impState.realUser.gameNick}
@@ -34,6 +38,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <main className="mx-auto flex w-full max-w-[1720px] flex-1 flex-col gap-6 px-4 py-6">
         {children}
       </main>
-    </>
+    </AlertsProvider>
   )
 }

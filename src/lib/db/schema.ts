@@ -1,5 +1,5 @@
-import { relations } from "drizzle-orm"
-import { boolean, integer, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core"
+import { relations, sql } from "drizzle-orm"
+import { boolean, check, index, integer, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core"
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -25,6 +25,19 @@ export const userCharacters = pgTable("user_characters", {
   isMain: boolean("is_main").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const personalTimers = pgTable("personal_timers", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  characterId: text("character_id").references(() => userCharacters.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  intervalMinutes: integer("interval_minutes").notNull(),
+  lastCompletedAt: timestamp("last_completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("personal_timers_user_id_idx").on(table.userId),
+  check("personal_timers_interval_minutes_check", sql`${table.intervalMinutes} BETWEEN 1 AND 525600`),
+])
 
 export { ROLE_V3, PREDEFINED_ROLES, type PredefinedRole } from "@/lib/constants"
 
