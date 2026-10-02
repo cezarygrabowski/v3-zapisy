@@ -47,8 +47,10 @@ Bez `DATABASE_URL` w `.env.local` baza to PGlite w `./data` (gitignored). Neon j
 `v3-zapisy` działa jako osobna usługa systemd na `127.0.0.1:3001`, za istniejącym
 Nginxem. PostgreSQL działa lokalnie na VPS-ie, z osobną bazą `elder_hub` i użytkownikiem.
 Po przełączeniu `DATABASE_URL` wskazuje na `127.0.0.1:5432`; port bazy nie jest publiczny.
-Sam import kopii nie przełącza aplikacji. Do czasu końcowego eksportu i zmiany
-`DATABASE_URL` Neon pozostaje źródłem bieżących danych.
+Baza została przeniesiona z Neon przez końcowy eksport i zweryfikowany import.
+Neon pozostaje archiwum z wyłączonymi zapisami; stary projekt Vercel jest
+wstrzymany i odłączony od GitHub. Produkcyjną konfiguracją zarządzają sekrety
+środowiska `production` w GitHub.
 Build `output: "standalone"` zawiera serwer i jego
 zależności; na VPS-ie wystarczy Node.js 22 lub nowszy.
 
