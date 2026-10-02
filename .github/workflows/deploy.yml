@@ -24,7 +24,7 @@ jobs:
       - run: shellcheck deploy/*.sh tests/deployment/release-test.sh
       - run: bash tests/deployment/release-test.sh
       - run: npm run build
-    env:
+        env:
           NEXT_TELEMETRY_DISABLED: '1'
       - name: Package standalone server
         run: |
