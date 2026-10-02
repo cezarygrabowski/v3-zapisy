@@ -1,0 +1,9 @@
+[Unit]
+Description=Check ElderHub Discord notifications hourly
+
+[Timer]
+OnCalendar=hourly
+Unit=v3-zapisy-cron.service
+
+[Install]
+WantedBy=timers.target

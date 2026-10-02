@@ -1,0 +1,14 @@
+[Unit]
+Description=ElderHub Discord notifications
+After=v3-zapisy.service
+
+[Service]
+Type=oneshot
+User=v3-zapisy
+Group=v3-zapisy
+EnvironmentFile=/srv/v3-zapisy/shared/.env
+ExecStart=/usr/bin/node /srv/v3-zapisy/current/deploy/cron.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

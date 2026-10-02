@@ -1,0 +1,28 @@
+[Unit]
+Description=ElderHub Next.js server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=v3-zapisy
+Group=v3-zapisy
+WorkingDirectory=/srv/v3-zapisy/current
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3001
+EnvironmentFile=/srv/v3-zapisy/shared/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/v3-zapisy/current/.next/cache
+
+[Install]
+WantedBy=multi-user.target
