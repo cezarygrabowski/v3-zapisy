@@ -292,16 +292,24 @@ async function createDb(): Promise<AppDb> {
   const databaseUrl = process.env.DATABASE_URL
 
   if (databaseUrl) {
-    const { neon } = await import("@neondatabase/serverless")
-    const { drizzle } = await import("drizzle-orm/neon-http")
-    const db = drizzle(neon(databaseUrl), { schema })
-    await ensureSchema(db)
+    const { Pool } = await import("pg")
+    const { drizzle } = await import("drizzle-orm/node-postgres")
+    const pool = new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 10000 })
+    pool.on("error", (error) => console.error("[db] Idle connection error:", error.message))
+    const db = drizzle(pool, { schema })
+    try {
+      await pool.query("SELECT 1")
+      await ensureSchema(db)
+    } catch (error) {
+      await pool.end()
+      throw error
+    }
     globalForDb.schemaVersion = SCHEMA_VERSION
     return db as unknown as AppDb
   }
 
   if (process.env.NODE_ENV === "production") {
-    throw new Error("DATABASE_URL is required in production (Neon Postgres).")
+    throw new Error("DATABASE_URL is required in production (PostgreSQL).")
   }
 
   const { PGlite } = await import("@electric-sql/pglite")

@@ -18,6 +18,11 @@ chown v3-zapisy-deploy:v3-zapisy /home/v3-zapisy-deploy/.ssh/authorized_keys
 chmod 0600 /home/v3-zapisy-deploy/.ssh/authorized_keys
 install -m 0644 "$config_dir/v3-zapisy.service" /etc/systemd/system/
 install -m 0644 "$config_dir/v3-zapisy-cron.service" "$config_dir/v3-zapisy-cron.timer" /etc/systemd/system/
+if id postgres >/dev/null 2>&1; then
+    install -d -m 0700 -o postgres -g postgres /var/backups/elder-hub/daily
+    install -m 0755 "$config_dir/backup.sh" /usr/local/sbin/v3-zapisy-backup
+    install -m 0644 "$config_dir/v3-zapisy-backup.service" "$config_dir/v3-zapisy-backup.timer" /etc/systemd/system/
+fi
 printf 'v3-zapisy-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart v3-zapisy.service, /usr/bin/systemctl stop v3-zapisy.service\n' > /etc/sudoers.d/v3-zapisy-deploy
 chmod 0440 /etc/sudoers.d/v3-zapisy-deploy
 visudo -cf /etc/sudoers.d/v3-zapisy-deploy

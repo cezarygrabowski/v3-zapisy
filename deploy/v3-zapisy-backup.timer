@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily ElderHub database backup
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+Persistent=true
+Unit=v3-zapisy-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -45,7 +45,9 @@ Bez `DATABASE_URL` w `.env.local` baza to PGlite w `./data` (gitignored). Neon j
 ## VPS OVH
 
 `v3-zapisy` działa jako osobna usługa systemd na `127.0.0.1:3001`, za istniejącym
-Nginxem. Baza pozostaje w Neon. Build `output: "standalone"` zawiera serwer i jego
+Nginxem. PostgreSQL działa lokalnie na VPS-ie, z osobną bazą `elder_hub` i użytkownikiem.
+`DATABASE_URL` wskazuje na `127.0.0.1:5432`; port bazy nie jest publiczny.
+Build `output: "standalone"` zawiera serwer i jego
 zależności; na VPS-ie wystarczy Node.js 22 lub nowszy.
 
 1. Zainstaluj Node.js na Ubuntu: `sudo apt-get install nodejs`.
@@ -79,6 +81,17 @@ zależności; na VPS-ie wystarczy Node.js 22 lub nowszy.
 Diagnostyka: `systemctl status v3-zapisy`, `journalctl -u v3-zapisy -n 50`,
 `curl --fail http://127.0.0.1:3001/api/health`. Test wdrożenia na Linuxie:
 `bash tests/deployment/release-test.sh`.
+
+Backup PostgreSQL: po utworzeniu bazy uruchom
+`sudo systemctl enable --now v3-zapisy-backup.timer`.
+Kopie powstają codziennie o 03:15 UTC w `/var/backups/elder-hub/daily`
+i są przechowywane przez 14 dni. Pierwszą kopię można wymusić przez
+`sudo systemctl start v3-zapisy-backup.service`.
+Kopie należy również przechowywać poza VPS-em; lokalny harmonogram tego nie robi.
+
+Test rzeczywistego PostgreSQL używa osobnej bazy `elder_hub_test` na localhost:
+`TEST_DATABASE_URL=postgres://.../elder_hub_test npm test`.
+Pozostałe testy nadal używają PGlite.
 
 ## Zasady
 

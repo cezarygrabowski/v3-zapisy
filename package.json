@@ -16,7 +16,6 @@
     "@electric-sql/pglite": "^0.5.8",
     "@neon/config": "^1.0.5",
     "@neon/env": "^1.1.5",
-    "@neondatabase/serverless": "^1.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
@@ -24,6 +23,7 @@
     "next": "16.3.3",
     "next-auth": "^5.0.0-beta.32",
     "next-themes": "^0.4.6",
+    "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "shadcn": "^4.19.0",
@@ -34,6 +34,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",

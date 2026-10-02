@@ -15,9 +15,9 @@ Every time ANY database change is made (new table, new column, altered relation,
    - Update `src/lib/db/schema.ts` with Drizzle definitions.
    - Increment `SCHEMA_VERSION` in `src/lib/db/index.ts`.
    - Add the corresponding DDL statement (`CREATE TABLE IF NOT EXISTS...` or `ALTER TABLE... ADD COLUMN IF NOT EXISTS...`) to `SCHEMA_SQL` in `src/lib/db/index.ts`.
-2. **Execute Immediately on Target Remote DB (Neon)**:
-   - Automated unit tests (`npm test`) run on isolated in-memory PGlite, which creates fresh tables on the fly. Passing unit tests DOES NOT mean the remote Neon database has the new tables!
-   - You MUST run a migration script directly against the real Neon database using `--env-file=.env.local` to ensure the DDL statements execute on Neon.
+2. **Execute Immediately on Target Production DB (PostgreSQL on OVH VPS)**:
+   - Unit tests use isolated PGlite; the PostgreSQL integration test uses a dedicated `elder_hub_test` database. Passing tests DOES NOT mean the production database has the new tables!
+   - You MUST run a migration script against the production `elder_hub` database on the VPS using `/srv/v3-zapisy/shared/.env`, then verify the DDL executed. Do not use development `.env.local` credentials for production migrations.
    - Verify the table exists by querying `information_schema.tables`.
 3. **Restart the Next.js Dev Server**:
    - Next.js and Turbopack cache database connection pools in `globalThis`.
@@ -30,7 +30,7 @@ Every time ANY database change is made (new table, new column, altered relation,
 When pushing changes to `main` or verifying production deployments:
 1. **Target Project Context**:
    - The production deployment is connected to project `elder-hub` (team: `fob5`), accessible at `https://elder-hub.vercel.app` (and alias `https://v3-zapisy.vercel.app`).
-2. **Checking Status via CLI**:
+2. **Checking Legacy Vercel Status via CLI**:
    - List recent deployments: `npx vercel ls elder-hub`
    - Inspect specific deployment status and build output: `npx vercel inspect <deployment-url-or-id>` (look for status: `● Ready`).
    - Check live HTTP response: `curl -sI https://elder-hub.vercel.app`
@@ -38,3 +38,8 @@ When pushing changes to `main` or verifying production deployments:
    - On Vercel Hobby accounts, cron jobs are restricted to at most **once per day** (e.g. `"0 6 * * *"`).
    - Any cron expression with higher frequency (e.g., hourly `"0 * * * *"`) will be rejected at deployment time by Vercel and fail the build. Always ensure `vercel.json` respects daily frequency.
 
+Production is moving to OVH VPS `57.131.43.47`. The VPS workflow is
+`.github/workflows/deploy.yml`; verify GitHub Actions and
+`systemctl status v3-zapisy` plus `curl --fail http://127.0.0.1:3001/api/health`
+on the VPS. Public production URL: `https://elder-hub.pl`.
+Do not enable both Vercel cron and `v3-zapisy-cron.timer` during cutover.
