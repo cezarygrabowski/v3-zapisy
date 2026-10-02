@@ -15,9 +15,10 @@ Every time ANY database change is made (new table, new column, altered relation,
    - Update `src/lib/db/schema.ts` with Drizzle definitions.
    - Increment `SCHEMA_VERSION` in `src/lib/db/index.ts`.
    - Add the corresponding DDL statement (`CREATE TABLE IF NOT EXISTS...` or `ALTER TABLE... ADD COLUMN IF NOT EXISTS...`) to `SCHEMA_SQL` in `src/lib/db/index.ts`.
-2. **Execute Immediately on Target Production DB (PostgreSQL on OVH VPS)**:
+2. **Execute Immediately on Target Production DB (PostgreSQL)**:
    - Unit tests use isolated PGlite; the PostgreSQL integration test uses a dedicated `elder_hub_test` database. Passing tests DOES NOT mean the production database has the new tables!
-   - You MUST run a migration script against the production `elder_hub` database on the VPS using `/srv/v3-zapisy/shared/.env`, then verify the DDL executed. Do not use development `.env.local` credentials for production migrations.
+   - First check the active production connection: importing a backup does not switch the application. Until cutover, Neon remains the production source; `elder_hub` on the VPS is an imported snapshot. Do not allow both databases to accept production writes.
+   - After cutover, run migration scripts against `elder_hub` on the VPS using `/srv/v3-zapisy/shared/.env`, then verify the DDL executed. Do not use development `.env.local` credentials for production migrations.
    - Verify the table exists by querying `information_schema.tables`.
 3. **Restart the Next.js Dev Server**:
    - Next.js and Turbopack cache database connection pools in `globalThis`.
