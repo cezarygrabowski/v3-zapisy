@@ -6,12 +6,16 @@ release_id=${1:?Pass the release ID}
 base=${DEPLOY_ROOT:-/srv/v3-zapisy}
 release="$base/releases/$release_id"
 archive="$base/incoming/$release_id.tar.gz"
+environment="$base/incoming/$release_id.env"
 exec 9>"$base/deploy.lock"
 flock -w 300 9
-test -f "$base/shared/.env"
+test -f "$environment"
 test -f "$archive"
 test ! -e "$release"
 previous=$(readlink -e "$base/current" || true)
+if [[ -n $previous && ! -f $previous/.env ]]; then
+    install -m 0640 "$base/shared/.env" "$previous/.env"
+fi
 activated=false
 
 recover() {
@@ -35,10 +39,14 @@ trap recover ERR
 mkdir "$release"
 tar --no-same-owner -xzf "$archive" -C "$release"
 test -f "$release/server.js"
+install -m 0640 "$environment" "$release/.env"
+rm -f "$environment"
 mkdir -p "$release/.next/cache"
 chmod -R u=rwX,g=rX,o= "$release"
 chown -R :v3-zapisy "$release"
 chmod g+w "$release/.next/cache"
+ln -sfn ../current/.env "$base/shared/.env.next"
+mv -Tf "$base/shared/.env.next" "$base/shared/.env"
 ln -sfn "$release" "$base/current.next"
 mv -Tf "$base/current.next" "$base/current"
 activated=true

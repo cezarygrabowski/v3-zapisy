@@ -55,18 +55,23 @@ zależności; na VPS-ie wystarczy Node.js 22 lub nowszy.
 1. Zainstaluj Node.js na Ubuntu: `sudo apt-get install nodejs`.
 2. Prześlij katalog `deploy` i publiczny klucz wdrożeniowy. Jako root uruchom
    `bash deploy/provision.sh /ścieżka/do/klucza.pub`.
-3. W `/srv/v3-zapisy/shared/.env` ustaw produkcyjne `DATABASE_URL`, `AUTH_SECRET`,
-   `AUTH_URL`, `APP_URL`, `CRON_SECRET` i zmienne Discorda z `.env.example`.
-   `AUTH_URL` i `APP_URL` to `https://elder-hub.pl`. Plik powinien mieć prawa
-   `0640` i właściciela `v3-zapisy-deploy:v3-zapisy`. Nie ustawiaj `VERCEL`
-   ani `DEV_LOGIN`. Sekrety oznaczone Sensitive w Vercel trzeba skopiować ze źródła
-   lub odtworzyć; eksport Vercel zwraca dla nich placeholdery.
+3. W GitHub → Settings → Environments → `production` ustaw sekrety
+   `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, `AUTH_DISCORD_ID`,
+   `AUTH_DISCORD_SECRET`, `DISCORD_GUILD_ID` i opcjonalnie `LEADER_DISCORD_IDS`.
+   Zachowaj obecne `AUTH_SECRET` i dane połączenia z bazą. Discord wymaga całego
+   zestawu trzech wartości; bez nich działa tylko logowanie hasłem.
+   Sekrety są przesyłane przez SSH podczas deployu i zapisywane w `.env` wydania
+   z prawami `0640`. Nie trafiają do artefaktów builda ani do przeglądarki.
+   `/srv/v3-zapisy/shared/.env` wskazuje na `.env` bieżącego wydania,
+   więc rollback przywraca również poprzednią konfigurację.
+   `AUTH_URL` i `APP_URL` to `https://elder-hub.pl`, a `DEV_LOGIN=false`.
 4. W środowisku GitHub Actions `production` ustaw zmienne `DEPLOY_HOST` i
    `DEPLOY_USER=v3-zapisy-deploy` oraz sekrety `DEPLOY_SSH_KEY` i
    `DEPLOY_KNOWN_HOSTS` (zweryfikowany klucz hosta VPS).
 5. Workflow `.github/workflows/deploy.yml` testuje i buduje aplikację na Linuxie,
    a push do `main` wdraża ją przez SSH. Po restarcie sprawdza `/api/health`,
    łącznie z dostępem do bazy. Przy błędzie przywraca poprzednią wersję.
+   Po zmianie sekretów uruchom workflow ręcznie lub wykonaj kolejny push do `main`.
 6. Konfiguracja `deploy/nginx.conf` obsługuje `elder-hub.pl` i przekierowuje `www`
    na domenę główną. Zainstaluj jako
    `/etc/nginx/sites-available/v3-zapisy` i dodaj symlink w `sites-enabled`.
@@ -76,7 +81,9 @@ zależności; na VPS-ie wystarczy Node.js 22 lub nowszy.
    Najpierw Nginx musi obsługiwać HTTP i ścieżkę `/.well-known/acme-challenge/`,
    a rekordy A i AAAA muszą wskazywać na ten VPS. Dodaj
    `https://elder-hub.pl/api/auth/callback/discord` do redirectów aplikacji Discord.
-8. Harmonogram Vercel został usunięty. Po uruchomieniu domeny i sprawdzeniu aplikacji
+8. Przed uruchomieniem timera wyłącz cron starej produkcji na Vercelu.
+   Usunięcie harmonogramu z `vercel.json` nie wyłącza go w starszym aktywnym wdrożeniu.
+   Po uruchomieniu domeny i sprawdzeniu aplikacji
    uruchom `sudo systemctl enable --now v3-zapisy-cron.timer`.
    Timer sprawdza powiadomienia co godzinę i respektuje ustawioną godzinę w Warszawie.
 

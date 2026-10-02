@@ -61,6 +61,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: production
+    env:
+      RELEASE_ID: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
     concurrency:
       group: v3-zapisy-production
       cancel-in-progress: false
@@ -69,6 +71,19 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: release-${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Prepare production environment
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          AUTH_DISCORD_ID: ${{ secrets.AUTH_DISCORD_ID }}
+          AUTH_DISCORD_SECRET: ${{ secrets.AUTH_DISCORD_SECRET }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+          LEADER_DISCORD_IDS: ${{ secrets.LEADER_DISCORD_IDS }}
+        run: node deploy/environment.mjs "$RUNNER_TEMP/$RELEASE_ID.env"
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -82,7 +97,6 @@ jobs:
         env:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
           DEPLOY_USER: ${{ vars.DEPLOY_USER }}
-          RELEASE_ID: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           EXPECTED_SHA: ${{ github.sha }}
@@ -91,7 +105,8 @@ jobs:
           latest=$(gh api "repos/$GH_REPO/commits/main" --jq .sha)
           test "$latest" = "$EXPECTED_SHA" || { echo 'Refusing stale deployment'; exit 1; }
           scp -o BatchMode=yes -o StrictHostKeyChecking=yes release.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/srv/v3-zapisy/incoming/$RELEASE_ID.tar.gz"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes "$RUNNER_TEMP/$RELEASE_ID.env" "$DEPLOY_USER@$DEPLOY_HOST:/srv/v3-zapisy/incoming/$RELEASE_ID.env"
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" "bash -s -- '$RELEASE_ID'" < deploy/release.sh
       - name: Remove SSH credentials
         if: always()
-        run: rm -f ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+        run: rm -f ~/.ssh/id_ed25519 ~/.ssh/known_hosts "$RUNNER_TEMP/$RELEASE_ID.env"
