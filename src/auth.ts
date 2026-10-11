@@ -54,6 +54,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
       ...(discordConfigured
         ? [
             Discord({
+              // Discord sends iss=https://discord.com on callback (RFC 9207); Auth.js defaults to authjs.dev and rejects it.
+              issuer: "https://discord.com",
               authorization: { params: { scope: "identify guilds" } },
             }),
           ]
