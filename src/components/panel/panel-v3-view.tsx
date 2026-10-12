@@ -12,7 +12,7 @@ import {
 import { MAP_ZONES, POSITIONS, positionLabel, slotLabel, type PositionId, type SlotId } from "@/lib/constants"
 import type { KillLogItem, RosterMember, RunSyncState } from "@/lib/queries"
 import type { EventDetails } from "@/lib/calendar-types"
-import { formatDatePl, getTimeUntilEvent, isV3SignupDateLocked } from "@/lib/dates"
+import { formatDatePl, getTimeUntilEvent, isV3SelfWithdrawLocked, isV3SignupDateLocked } from "@/lib/dates"
 import { V3Map } from "@/components/v3-map"
 import { RunTimers } from "@/components/run-timers"
 import { EventDetailDialog } from "@/components/calendar/event-detail-dialog"
@@ -152,6 +152,7 @@ export function PanelV3View({
   }, [])
 
   // If there's an active/upcoming V3 calendar event with spots, use its spots as the roster
+  const canSelfManageSpot = !(v3CalendarEvent && !isLeader && isV3SelfWithdrawLocked(v3CalendarEvent.type, v3CalendarEvent.date, v3CalendarEvent.startTime))
   const calendarSpotsRoster: RosterMember[] | null = v3CalendarEvent
     ? POSITIONS.map((pos) => {
         const signup = v3CalendarEvent.signups.find((s) => s.spot === pos.id)
@@ -670,7 +671,7 @@ export function PanelV3View({
                             </Badge>
                           ) : null}
 
-                          {v3CalendarEvent && (isMine || isLeader) && spotSignup ? (
+                          {v3CalendarEvent && ((isMine && canSelfManageSpot) || isLeader) && spotSignup ? (
                             <div className="flex items-center gap-1 ml-1">
                               <button
                                 type="button"
