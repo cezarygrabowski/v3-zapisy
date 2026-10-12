@@ -264,3 +264,8 @@ export function getTimeUntilEvent(eventDate: string, startTime: string, now = ne
 
   return { diffMinutes, isLessThan2Hours, hasStarted, label }
 }
+
+/** After a V3 event starts, players can't withdraw or transfer their spot — only an admin can. */
+export function isV3SelfWithdrawLocked(eventType: string, eventDate: string, startTime: string, now = new Date()): boolean {
+  return eventType === "v3" && getTimeUntilEvent(eventDate, startTime, now).hasStarted
+}

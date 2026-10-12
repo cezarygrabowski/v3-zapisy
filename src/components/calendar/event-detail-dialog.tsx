@@ -28,7 +28,7 @@ import {
   type EventDetails,
   type GuildEventType,
 } from "@/lib/calendar-types"
-import { formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
+import { formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isV3SelfWithdrawLocked, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
 import { positionLabel } from "@/lib/constants"
 import { SpotTransferDialog } from "@/components/calendar/spot-transfer-dialog"
 import { GiveYellowCardDialog } from "@/components/calendar/give-yellow-card-dialog"
@@ -434,6 +434,7 @@ export function EventDetailDialog({
   const feeLock = isV3 ? event?.currentUserFeeLock : undefined
   const isFeeLocked = Boolean(feeLock?.isLocked)
   const isLocked = isDateLocked || isFeeLocked
+  const canSelfManageSpot = !(event && !isLeader && isV3SelfWithdrawLocked(event.type, event.date, event.startTime))
 
   return (
     <>
@@ -923,36 +924,40 @@ export function EventDetailDialog({
                               ) : null}
                             </div>
                             <div className="flex items-center gap-2">
-                              <Button
-                                size="xs"
-                                variant="secondary"
-                                className="text-xs h-7 gap-1 font-medium"
-                                onClick={() =>
-                                  setTransferModal({
-                                    signupId: signup.signupId,
-                                    spot: signup.spot,
-                                    ownerNick: signup.characterName || signup.gameNick,
-                                  })
-                                }
-                              >
-                                <Users className="size-3" />
-                                Przekaż spot (Zastępstwo)
-                              </Button>
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                className="text-xs text-destructive hover:text-destructive h-7"
-                                onClick={() =>
-                                  handleWithdrawClick({
-                                    signupId: signup.signupId,
-                                    userId: currentUserId,
-                                    spot: signup.spot,
-                                  })
-                                }
-                                disabled={pending}
-                              >
-                                Zwolnij spot
-                              </Button>
+                              {canSelfManageSpot ? (
+                                <Button
+                                  size="xs"
+                                  variant="secondary"
+                                  className="text-xs h-7 gap-1 font-medium"
+                                  onClick={() =>
+                                    setTransferModal({
+                                      signupId: signup.signupId,
+                                      spot: signup.spot,
+                                      ownerNick: signup.characterName || signup.gameNick,
+                                    })
+                                  }
+                                >
+                                  <Users className="size-3" />
+                                  Przekaż spot (Zastępstwo)
+                                </Button>
+                              ) : null}
+                              {canSelfManageSpot ? (
+                                <Button
+                                  size="xs"
+                                  variant="outline"
+                                  className="text-xs text-destructive hover:text-destructive h-7"
+                                  onClick={() =>
+                                    handleWithdrawClick({
+                                      signupId: signup.signupId,
+                                      userId: currentUserId,
+                                      spot: signup.spot,
+                                    })
+                                  }
+                                  disabled={pending}
+                                >
+                                  Zwolnij spot
+                                </Button>
+                              ) : null}
                             </div>
                           </div>
                         ))}
@@ -1212,7 +1217,7 @@ export function EventDetailDialog({
                             <div className="flex items-center gap-2 justify-end shrink-0">
                               {spotSignup ? (
                                 <div className="flex items-center gap-1.5">
-                                  {(isMine || isLeader) && (
+                                  {((isMine && canSelfManageSpot) || isLeader) && (
                                     <Button
                                       size="xs"
                                       variant="secondary"
@@ -1232,7 +1237,7 @@ export function EventDetailDialog({
                                     </Button>
                                   )}
 
-                                  {isLeader || isMine ? (
+                                  {isLeader || (isMine && canSelfManageSpot) ? (
                                     <Button
                                       size="sm"
                                       variant="outline"

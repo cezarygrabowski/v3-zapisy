@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { calculateDurationHours, type RecurrenceType } from "@/lib/calendar-types"
-import { addDays, formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isIsoDate, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
+import { addDays, formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isIsoDate, isV3SelfWithdrawLocked, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
 import { getDb } from "@/lib/db"
 import { getCurrentUser, requireUser } from "@/lib/session"
 import { and, eq } from "drizzle-orm"
@@ -395,11 +395,16 @@ export async function withdrawFromGuildEvent(input: {
   const [event] = await db
     .select({
       id: guildEvents.id,
+      type: guildEvents.type,
       date: guildEvents.date,
       startTime: guildEvents.startTime,
     })
     .from(guildEvents)
     .where(eq(guildEvents.id, signup.eventId))
+
+  if (!user.isLeader && event && isV3SelfWithdrawLocked(event.type, event.date, event.startTime)) {
+    return fail("Wyprawa V3 już się rozpoczęła — wypisać może tylko admin.")
+  }
 
   const timeInfo = event ? getTimeUntilEvent(event.date, event.startTime) : null
 
@@ -510,6 +515,10 @@ export async function transferSpotToUser(input: {
     .where(eq(guildEvents.id, signup.eventId))
 
   if (!event) return fail("Nie znaleziono wydarzenia.")
+
+  if (!user.isLeader && isV3SelfWithdrawLocked(event.type, event.date, event.startTime)) {
+    return fail("Wyprawa V3 już się rozpoczęła — przekazać spot może tylko admin.")
+  }
 
   if (event.type === "v3") {
     if (!hasV3Access(targetUser)) {

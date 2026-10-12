@@ -1,6 +1,6 @@
 import test, { describe } from "node:test"
 import assert from "node:assert/strict"
-import { isV3SignupDateLocked, getV3SignupOpenDate } from "@/lib/dates"
+import { isV3SignupDateLocked, getV3SignupOpenDate, isV3SelfWithdrawLocked } from "@/lib/dates"
 import { hasV3Access, isUserVerified, getUserRoles } from "@/lib/permissions"
 import { formatEventSignupCount, formatEventSignupLabel } from "@/lib/calendar-types"
 
@@ -191,5 +191,15 @@ describe("Event Signup Count and Limit Formatting", () => {
     assert.equal(formatEventSignupLabel({ type: "red_las", totalSignups: 1 }), "1 postać")
     assert.equal(formatEventSignupLabel({ type: "red_las", totalSignups: 3 }), "3 postacie")
     assert.equal(formatEventSignupLabel({ type: "red_las", totalSignups: 5 }), "5 postaci")
+  })
+})
+
+describe("V3 self-withdraw lock", () => {
+  test("locks only V3 events after start", () => {
+    const before = new Date("2026-09-26T15:59:00Z") // 17:59 Warsaw
+    const after = new Date("2026-09-26T16:00:00Z") // 18:00 Warsaw
+    assert.equal(isV3SelfWithdrawLocked("v3", "2026-09-26", "18:00", before), false)
+    assert.equal(isV3SelfWithdrawLocked("v3", "2026-09-26", "18:00", after), true)
+    assert.equal(isV3SelfWithdrawLocked("red_las", "2026-09-26", "18:00", after), false)
   })
 })
