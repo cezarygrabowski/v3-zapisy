@@ -321,7 +321,7 @@ async function ensureSchema(db: { execute: (query: ReturnType<typeof sql>) => Pr
     try {
       await db.execute(sql.raw(statement))
     } catch (error) {
-      console.warn("[db] Schema statement notice:", (error as Error)?.message || error)
+      console.error("[db] Schema statement failed:", statement.split("\n")[0], "-", (error as Error)?.message || error)
     }
   }
 }

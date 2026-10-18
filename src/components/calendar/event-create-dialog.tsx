@@ -74,7 +74,11 @@ export function EventCreateDialog({
   const [selectedDays, setSelectedDays] = useState<number[]>([]) // 1 = Pon, ..., 7 = Niedz
   const [maxParticipants, setMaxParticipants] = useState<number | "">("")
   const [description, setDescription] = useState("")
-  const [konwojGroupId, setKonwojGroupId] = useState(() => konwojGroups[0]?.id ?? "")
+  const [selectedKonwojGroupId, setKonwojGroupId] = useState(() => konwojGroups[0]?.id ?? "")
+  // The group list can change after mount (refresh, group created elsewhere); fall back to the first one.
+  const konwojGroupId = konwojGroups.some((g) => g.id === selectedKonwojGroupId)
+    ? selectedKonwojGroupId
+    : (konwojGroups[0]?.id ?? "")
 
   // Update values if initial props change while opening
   const prevInitialRef = useState({ initialDate, initialStartTime, initialEndTime })
@@ -133,19 +137,29 @@ export function EventCreateDialog({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (type === "konwoj" && !konwojGroupId) {
+      toast.error("Najpierw utwórz drużynę Konwoju w zakładce Konwój.")
+      return
+    }
     startTransition(async () => {
-      const res = await createGuildEvent({
-        title,
-        type,
-        color,
-        date,
-        startTime,
-        endTime,
-        recurringDays: selectedDays.length > 0 ? selectedDays : undefined,
-        maxParticipants: maxParticipants ? Number(maxParticipants) : null,
-        description,
-        konwojGroupId: type === "konwoj" ? konwojGroupId : undefined,
-      })
+      let res: Awaited<ReturnType<typeof createGuildEvent>>
+      try {
+        res = await createGuildEvent({
+          title,
+          type,
+          color,
+          date,
+          startTime,
+          endTime,
+          recurringDays: selectedDays.length > 0 ? selectedDays : undefined,
+          maxParticipants: maxParticipants ? Number(maxParticipants) : null,
+          description,
+          konwojGroupId: type === "konwoj" ? konwojGroupId : undefined,
+        })
+      } catch {
+        toast.error("Nie udało się utworzyć wydarzenia. Spróbuj ponownie.")
+        return
+      }
 
       if (!res.ok) {
         toast.error(res.error)
@@ -312,7 +326,7 @@ export function EventCreateDialog({
                 <FieldLabel htmlFor="event-konwoj-group">Drużyna</FieldLabel>
                 {konwojGroups.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Nie należysz do żadnej drużyny Konwoju. Admin przypisuje drużyny w zakładce Konwój.
+                    Brak drużyny Konwoju do wyboru. Drużyny i ich członków ustawia admin w zakładce Konwój.
                   </p>
                 ) : (
                   <select

@@ -120,31 +120,31 @@ export async function createGuildEvent(input: {
     konwojGroupId = group.id
   }
 
-  let firstEventId = ""
+  const rows = datesToCreate.map((targetDate) => ({
+    id: crypto.randomUUID(),
+    title,
+    type: input.type || "v3",
+    color: input.color || "blue",
+    date: targetDate,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    durationHours: Math.max(1, Math.round(durationHours)),
+    signupMode: "spots",
+    recurrence: recurrenceLabel,
+    maxParticipants: maxParts,
+    description: input.description?.trim() || null,
+    status: "planned",
+    konwojGroupId,
+    createdBy: user.id,
+  }))
 
-  for (let i = 0; i < datesToCreate.length; i++) {
-    const targetDate = datesToCreate[i]
-    const eventId = crypto.randomUUID()
-    if (i === 0) firstEventId = eventId
-
-    await db.insert(guildEvents).values({
-      id: eventId,
-      title,
-      type: input.type || "v3",
-      color: input.color || "blue",
-      date: targetDate,
-      startTime: input.startTime,
-      endTime: input.endTime,
-      durationHours: Math.max(1, Math.round(durationHours)),
-      signupMode: "spots",
-      recurrence: recurrenceLabel,
-      maxParticipants: maxParts,
-      description: input.description?.trim() || null,
-      status: "planned",
-      konwojGroupId,
-      createdBy: user.id,
-    })
+  try {
+    await db.insert(guildEvents).values(rows)
+  } catch (error) {
+    console.error("[calendar] createGuildEvent insert failed:", error)
+    return fail("Nie udało się zapisać wydarzenia w bazie. Daj znać adminowi.")
   }
+  const firstEventId = rows[0].id
 
   revalidatePath("/kalendarz")
   revalidatePath("/")
