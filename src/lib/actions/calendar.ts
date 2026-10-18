@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { calculateDurationHours, EVENT_TYPE_METADATA, type GuildEventType, type RecurrenceType } from "@/lib/calendar-types"
-import { addDays, formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isIsoDate, isV3SelfWithdrawLocked, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
+import { addDays, formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isIsoDate, isKonwojSignupClosed, isV3SelfWithdrawLocked, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
 import { getDb } from "@/lib/db"
 import { getCurrentUser, requireUser } from "@/lib/session"
 import { and, eq } from "drizzle-orm"
@@ -176,6 +176,9 @@ export async function signUpForGuildEvent(input: {
       id: guildEvents.id,
       type: guildEvents.type,
       date: guildEvents.date,
+      startTime: guildEvents.startTime,
+      endTime: guildEvents.endTime,
+      durationHours: guildEvents.durationHours,
       maxParticipants: guildEvents.maxParticipants,
       konwojGroupId: guildEvents.konwojGroupId,
     })
@@ -185,6 +188,9 @@ export async function signUpForGuildEvent(input: {
   if (!event) return fail("Nie znaleziono wydarzenia.")
 
   if (event.type === "konwoj") {
+    if (!user.isLeader && isKonwojSignupClosed(event.type, event.date, event.startTime, event.endTime, event.durationHours)) {
+      return fail("Ten Konwój już się zakończył — zapisy są zamknięte.")
+    }
     if (typeof input.hasHorse !== "boolean") return fail("Zaznacz, czy masz konia 30 lvl.")
     const [member] = await db
       .select({ groupId: konwojGroupMembers.groupId })
@@ -431,12 +437,21 @@ export async function withdrawFromGuildEvent(input: {
       type: guildEvents.type,
       date: guildEvents.date,
       startTime: guildEvents.startTime,
+      endTime: guildEvents.endTime,
+      durationHours: guildEvents.durationHours,
     })
     .from(guildEvents)
     .where(eq(guildEvents.id, signup.eventId))
 
   if (!user.isLeader && event && isV3SelfWithdrawLocked(event.type, event.date, event.startTime)) {
     return fail("Wyprawa V3 już się rozpoczęła — wypisać może tylko admin.")
+  }
+  if (
+    !user.isLeader &&
+    event &&
+    isKonwojSignupClosed(event.type, event.date, event.startTime, event.endTime, event.durationHours)
+  ) {
+    return fail("Ten Konwój już się zakończył — wypisać może tylko admin.")
   }
 
   const timeInfo = event ? getTimeUntilEvent(event.date, event.startTime) : null

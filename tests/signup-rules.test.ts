@@ -1,6 +1,6 @@
 import test, { describe } from "node:test"
 import assert from "node:assert/strict"
-import { isV3SignupDateLocked, getV3SignupOpenDate, isV3SelfWithdrawLocked } from "@/lib/dates"
+import { isV3SignupDateLocked, getV3SignupOpenDate, isKonwojSignupClosed, isV3SelfWithdrawLocked } from "@/lib/dates"
 import { hasV3Access, isUserVerified, getUserRoles } from "@/lib/permissions"
 import { formatEventSignupCount, formatEventSignupLabel } from "@/lib/calendar-types"
 
@@ -201,5 +201,23 @@ describe("V3 self-withdraw lock", () => {
     assert.equal(isV3SelfWithdrawLocked("v3", "2026-09-26", "18:00", before), false)
     assert.equal(isV3SelfWithdrawLocked("v3", "2026-09-26", "18:00", after), true)
     assert.equal(isV3SelfWithdrawLocked("red_las", "2026-09-26", "18:00", after), false)
+  })
+})
+
+describe("Konwój signup close", () => {
+  test("closes only Konwój events once they end", () => {
+    const during = new Date("2026-09-26T18:59:00Z") // 20:59 Warsaw
+    const end = new Date("2026-09-26T19:00:00Z") // 21:00 Warsaw
+    assert.equal(isKonwojSignupClosed("konwoj", "2026-09-26", "18:00", "21:00", 3, during), false)
+    assert.equal(isKonwojSignupClosed("konwoj", "2026-09-26", "18:00", "21:00", 3, end), true)
+    assert.equal(isKonwojSignupClosed("v3", "2026-09-26", "18:00", "21:00", 3, end), false)
+  })
+
+  test("handles events ending after midnight and missing end time", () => {
+    const beforeEnd = new Date("2026-09-26T22:59:00Z") // 00:59 Warsaw next day
+    const afterEnd = new Date("2026-09-26T23:00:00Z") // 01:00 Warsaw next day
+    assert.equal(isKonwojSignupClosed("konwoj", "2026-09-26", "23:00", "01:00", 2, beforeEnd), false)
+    assert.equal(isKonwojSignupClosed("konwoj", "2026-09-26", "23:00", "01:00", 2, afterEnd), true)
+    assert.equal(isKonwojSignupClosed("konwoj", "2026-09-26", "23:00", null, 2, afterEnd), true)
   })
 })

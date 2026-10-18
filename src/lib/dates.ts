@@ -269,3 +269,24 @@ export function getTimeUntilEvent(eventDate: string, startTime: string, now = ne
 export function isV3SelfWithdrawLocked(eventType: string, eventDate: string, startTime: string, now = new Date()): boolean {
   return eventType === "v3" && getTimeUntilEvent(eventDate, startTime, now).hasStarted
 }
+
+/** Konwój: players can sign up and withdraw until the event ends; afterwards only an admin can. */
+export function isKonwojSignupClosed(
+  eventType: string,
+  eventDate: string,
+  startTime: string,
+  endTime: string | null,
+  durationHours: number,
+  now = new Date()
+): boolean {
+  if (eventType !== "konwoj") return false
+  const start = warsawWallToDate(eventDate, startTime.length === 5 ? `${startTime}:00` : startTime)
+  if (!start) return false
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(":").map(Number)
+    return (h || 0) * 60 + (m || 0)
+  }
+  let minutes = endTime ? toMinutes(endTime) - toMinutes(startTime) : durationHours * 60
+  if (minutes <= 0) minutes += 24 * 60 // ends after midnight
+  return now.getTime() >= start.getTime() + minutes * 60_000
+}

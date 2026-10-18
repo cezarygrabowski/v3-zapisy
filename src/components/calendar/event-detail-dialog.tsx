@@ -28,7 +28,7 @@ import {
   type EventDetails,
   type GuildEventType,
 } from "@/lib/calendar-types"
-import { formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isV3SelfWithdrawLocked, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
+import { formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isKonwojSignupClosed, isV3SelfWithdrawLocked, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
 import { positionLabel } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 import { SpotTransferDialog } from "@/components/calendar/spot-transfer-dialog"
@@ -439,6 +439,11 @@ export function EventDetailDialog({
   const isFeeLocked = Boolean(feeLock?.isLocked)
   const isLocked = isDateLocked || isFeeLocked
   const canSelfManageSpot = !(event && !isLeader && isV3SelfWithdrawLocked(event.type, event.date, event.startTime))
+  const isKonwojClosed = Boolean(
+    event &&
+      !isLeader &&
+      isKonwojSignupClosed(event.type, event.date, event.startTime, event.endTime, event.durationHours)
+  )
 
   return (
     <>
@@ -1473,7 +1478,7 @@ export function EventDetailDialog({
                                   </Button>
                                 ) : null}
 
-                                {isLeader || p.userId === currentUserId ? (
+                                {isLeader || (p.userId === currentUserId && !isKonwojClosed) ? (
                                   <Button
                                     size="xs"
                                     variant="ghost"
@@ -1502,15 +1507,19 @@ export function EventDetailDialog({
                         {mySignup ? (
                           <div className="flex flex-col gap-2 text-xs">
                             <span className="text-emerald-500 font-medium">✓ Jesteś już zapisany!</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs text-destructive hover:text-destructive"
-                              onClick={() => handleWithdrawClick({ signupId: mySignup.signupId, userId: currentUserId, spot: mySignup.spot })}
-                            >
-                              Wypisz się
-                            </Button>
+                            {isKonwojClosed ? null : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-xs text-destructive hover:text-destructive"
+                                onClick={() => handleWithdrawClick({ signupId: mySignup.signupId, userId: currentUserId, spot: mySignup.spot })}
+                              >
+                                Wypisz się
+                              </Button>
+                            )}
                           </div>
+                        ) : isKonwojClosed ? (
+                          <p className="text-xs text-muted-foreground">Konwój już się zakończył — zapisy są zamknięte.</p>
                         ) : (
                           <form onSubmit={handlePartySignUp} className="flex flex-col gap-3">
                             <Field>
