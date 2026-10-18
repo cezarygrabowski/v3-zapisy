@@ -1,5 +1,5 @@
 import { relations, sql } from "drizzle-orm"
-import { boolean, check, index, integer, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core"
+import { boolean, check, doublePrecision, index, integer, pgTable, primaryKey, text, timestamp, unique } from "drizzle-orm/pg-core"
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -350,6 +350,7 @@ export const guildEvents = pgTable("guild_events", {
   status: text("status").notNull().default("planned"), // 'planned' | 'active' | 'finished' | 'cancelled'
   feeWaived: boolean("fee_waived").notNull().default(false),
   feeWaivedReason: text("fee_waived_reason"),
+  konwojGroupId: text("konwoj_group_id").references(() => konwojGroups.id, { onDelete: "set null" }),
   createdBy: text("created_by")
     .notNull()
     .references(() => users.id),
@@ -373,8 +374,74 @@ export const guildEventSignups = pgTable(
     spot: text("spot"), // e.g. "R1", "R2", "PRAWO", "polka", "boss"
     role: text("role"), // e.g. "pvp", "pvm", "Ninja Dagger"
     attended: boolean("attended").notNull().default(false),
+    hasHorse: boolean("has_horse"), // Konwój only: konie 30 lvl wjeżdżają do świątyni
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   }
+)
+
+// --- KONWÓJ KOMPANII ---
+export const konwojGroups = pgTable("konwoj_groups", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+})
+
+// A player belongs to at most one group.
+export const konwojGroupMembers = pgTable("konwoj_group_members", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  groupId: text("group_id")
+    .notNull()
+    .references(() => konwojGroups.id, { onDelete: "cascade" }),
+  isTreasurer: boolean("is_treasurer").notNull().default(false),
+})
+
+export const konwojWeeks = pgTable(
+  "konwoj_weeks",
+  {
+    groupId: text("group_id")
+      .notNull()
+      .references(() => konwojGroups.id, { onDelete: "cascade" }),
+    weekStart: text("week_start").notNull(),
+    shopYangKk: doublePrecision("shop_yang_kk").notNull().default(0), // czyste yang na postaci
+    shopItemsValueKk: doublePrecision("shop_items_value_kk").notNull().default(0), // szacunek za itemy na shopie
+    updatedBy: text("updated_by").references(() => users.id),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.groupId, table.weekStart] })]
+)
+
+export const konwojPayouts = pgTable(
+  "konwoj_payouts",
+  {
+    groupId: text("group_id")
+      .notNull()
+      .references(() => konwojGroups.id, { onDelete: "cascade" }),
+    weekStart: text("week_start").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    paidBy: text("paid_by").references(() => users.id),
+    paidAt: timestamp("paid_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique("konwoj_payouts_group_week_user_unique").on(table.groupId, table.weekStart, table.userId)]
+)
+
+// Per-group price list; not tied to a week.
+export const konwojPrices = pgTable(
+  "konwoj_prices",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => konwojGroups.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    marketPriceKk: doublePrecision("market_price_kk"),
+    guildPriceKk: doublePrecision("guild_price_kk"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique("konwoj_prices_group_name_unique").on(table.groupId, table.name)]
 )
 
 export const guildEventEnemyReports = pgTable(

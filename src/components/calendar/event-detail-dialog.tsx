@@ -30,6 +30,7 @@ import {
 } from "@/lib/calendar-types"
 import { formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isV3SelfWithdrawLocked, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
 import { positionLabel } from "@/lib/constants"
+import { cn } from "@/lib/utils"
 import { SpotTransferDialog } from "@/components/calendar/spot-transfer-dialog"
 import { GiveYellowCardDialog } from "@/components/calendar/give-yellow-card-dialog"
 import { Badge } from "@/components/ui/badge"
@@ -77,6 +78,7 @@ export function EventDetailDialog({
 
   // Party signup role
   const [partyRole, setPartyRole] = useState("")
+  const [partyHasHorse, setPartyHasHorse] = useState<boolean | null>(null)
 
   // Edit properties state (identical to create form)
   const [isEditing, setIsEditing] = useState(false)
@@ -322,6 +324,7 @@ export function EventDetailDialog({
       const res = await signUpForGuildEvent({
         eventId: event.id,
         role: partyRole,
+        hasHorse: partyHasHorse ?? undefined,
       })
       if (!res.ok) {
         toast.error(res.error)
@@ -329,6 +332,7 @@ export function EventDetailDialog({
       }
       toast.success(res.message)
       setPartyRole("")
+      setPartyHasHorse(null)
       refreshDetails()
     })
   }
@@ -513,7 +517,7 @@ export function EventDetailDialog({
                                 }}
                                 className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 py-1 pr-9 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer [color-scheme:light] dark:[color-scheme:dark] dark:bg-zinc-900 dark:text-zinc-100"
                               >
-                                {Object.entries(EVENT_TYPE_METADATA).map(([k, v]) => (
+                                {Object.entries(EVENT_TYPE_METADATA).filter(([k, v]) => !v.hidden || k === editType).map(([k, v]) => (
                                   <option
                                     key={k}
                                     value={k}
@@ -1404,9 +1408,16 @@ export function EventDetailDialog({
                     <div className="md:col-span-2 flex flex-col gap-3">
                       <div className="flex items-center justify-between">
                         <h3 className="font-heading font-semibold text-sm">Skład Party / Uczestnicy</h3>
-                        <Badge variant="secondary" className="font-mono text-xs">
-                          {event.signups.length}{event.maxParticipants ? ` / ${event.maxParticipants}` : ""} postaci
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          {event.type === "konwoj" ? (
+                            <Badge variant="outline" className="font-mono text-xs">
+                              🐎 {event.signups.filter((p) => p.hasHorse).length}/{event.signups.length}
+                            </Badge>
+                          ) : null}
+                          <Badge variant="secondary" className="font-mono text-xs">
+                            {event.signups.length}{event.maxParticipants ? ` / ${event.maxParticipants}` : ""} postaci
+                          </Badge>
+                        </div>
                       </div>
 
                       {event.signups.length === 0 ? (
@@ -1419,19 +1430,48 @@ export function EventDetailDialog({
                             return (
                               <div
                                 key={p.signupId}
-                                className="rounded-lg border p-2.5 flex items-center justify-between transition-colors bg-card"
+                                className={cn(
+                                  "rounded-lg border p-2.5 flex items-center justify-between transition-colors bg-card",
+                                  !p.attended && "opacity-60"
+                                )}
                               >
                                 <div className="flex items-center gap-2.5 truncate">
                                   <span className="font-mono text-xs text-muted-foreground w-4 text-center">
                                     #{idx + 1}
                                   </span>
-                                  <span className="font-semibold text-xs truncate">{p.gameNick}</span>
+                                  <span className={cn("font-semibold text-xs truncate", !p.attended && "line-through")}>
+                                    {p.gameNick}
+                                  </span>
                                   {p.role ? (
                                     <Badge variant="outline" className="text-[10px]">
                                       {p.role}
                                     </Badge>
                                   ) : null}
+                                  {event.type === "konwoj" ? (
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[10px]",
+                                        p.hasHorse ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400" : "border-amber-500/40 text-amber-600 dark:text-amber-400"
+                                      )}
+                                    >
+                                      {p.hasHorse ? "🐎 koń" : "bez konia"}
+                                    </Badge>
+                                  ) : null}
                                 </div>
+
+                                {isLeader || event.konwojTreasurerIds?.includes(currentUserId) ? (
+                                  <Button
+                                    size="xs"
+                                    variant={p.attended ? "secondary" : "outline"}
+                                    className="text-xs h-6 px-2 cursor-pointer shrink-0"
+                                    onClick={() => handleToggleAttendance(p.signupId)}
+                                    disabled={pending}
+                                    aria-pressed={p.attended}
+                                  >
+                                    {p.attended ? "✓ Był" : "Nie był"}
+                                  </Button>
+                                ) : null}
 
                                 {isLeader || p.userId === currentUserId ? (
                                   <Button
@@ -1483,7 +1523,36 @@ export function EventDetailDialog({
                                 className="h-8 text-xs"
                               />
                             </Field>
-                            <Button type="submit" size="sm" className="w-full text-xs font-semibold" disabled={pending}>
+                            {event.type === "konwoj" ? (
+                              <Field>
+                                <FieldLabel>Koń 30 lvl (wjazd do świątyni)</FieldLabel>
+                                <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Koń 30 lvl">
+                                  {[
+                                    { value: true, label: "🐎 Mam konia" },
+                                    { value: false, label: "Bez konia" },
+                                  ].map((opt) => (
+                                    <Button
+                                      key={opt.label}
+                                      type="button"
+                                      size="sm"
+                                      role="radio"
+                                      aria-checked={partyHasHorse === opt.value}
+                                      variant={partyHasHorse === opt.value ? "default" : "outline"}
+                                      className="text-xs"
+                                      onClick={() => setPartyHasHorse(opt.value)}
+                                    >
+                                      {opt.label}
+                                    </Button>
+                                  ))}
+                                </div>
+                              </Field>
+                            ) : null}
+                            <Button
+                              type="submit"
+                              size="sm"
+                              className="w-full text-xs font-semibold"
+                              disabled={pending || (event.type === "konwoj" && partyHasHorse === null)}
+                            >
                               {pending ? <Spinner data-icon="inline-start" /> : null}
                               Zapisz się do składu
                             </Button>

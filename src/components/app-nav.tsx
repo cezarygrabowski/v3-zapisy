@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/panel", label: "⚔️ Panel" },
   { href: "/alerty", label: "Alerty" },
   { href: "/kalendarz", label: "📅 Kalendarz" },
+  { href: "/konwoj", label: "🐍 Konwój" },
   { href: "/skladki", label: "Składki" },
   { href: "/statystyki", label: "Statystyki" },
   { href: "/regulamin", label: "Regulamin" },

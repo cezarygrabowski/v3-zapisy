@@ -1,6 +1,7 @@
 import { GuildCalendar } from "@/components/calendar/guild-calendar"
 import { listGuildEvents } from "@/lib/calendar-queries"
 import { addDays, isIsoDate, todayInWarsaw, weekStartForDate } from "@/lib/dates"
+import { listKonwojGroups } from "@/lib/konwoj"
 import { listUsers } from "@/lib/queries"
 import { requireUser } from "@/lib/session"
 
@@ -31,7 +32,7 @@ export default async function CalendarPage({
   const { getSignupAdvanceDays, getSignupOpenTime } = await import("@/lib/settings")
   const { getActivePenaltyForUser } = await import("@/lib/actions/penalties")
 
-  const [rawEvents, users, signupAdvanceDays, signupOpenTime, activePenalty] = await Promise.all([
+  const [rawEvents, users, signupAdvanceDays, signupOpenTime, activePenalty, konwojGroups] = await Promise.all([
     listGuildEvents({
       startDate,
       endDate,
@@ -42,6 +43,7 @@ export default async function CalendarPage({
     getSignupAdvanceDays(),
     getSignupOpenTime(),
     getActivePenaltyForUser(user.id),
+    listKonwojGroups(),
   ])
 
   // If user does not have V3 access, mask V3 events (keep them visible as scheduled, but hide counts, spots and description)
@@ -70,6 +72,9 @@ export default async function CalendarPage({
       signupAdvanceDays={signupAdvanceDays}
       signupOpenTime={signupOpenTime}
       userAllowedAdvanceDays={activePenalty ? activePenalty.allowedAdvanceDays : undefined}
+      konwojGroups={konwojGroups
+        .filter((g) => user.isLeader || g.members.some((m) => m.userId === user.id))
+        .map((g) => ({ id: g.id, name: g.name }))}
     />
   )
 }

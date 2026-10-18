@@ -7,7 +7,7 @@ type AppDb = {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 } & ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>
 
-const SCHEMA_VERSION = 10
+const SCHEMA_VERSION = 17
 
 const globalForDb = globalThis as unknown as {
   dbPromise?: Promise<AppDb>
@@ -275,6 +275,44 @@ const SCHEMA_SQL = [
       reason text NOT NULL DEFAULT 'nie da sie dropić, wróg na vce',
       created_at timestamptz NOT NULL DEFAULT now(),
       CONSTRAINT guild_event_enemy_reports_unique UNIQUE (event_id, user_id)
+    )`,
+  `ALTER TABLE guild_event_signups ADD COLUMN IF NOT EXISTS has_horse boolean`,
+  `CREATE TABLE IF NOT EXISTS konwoj_groups (
+      id text PRIMARY KEY,
+      name text NOT NULL UNIQUE,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `CREATE TABLE IF NOT EXISTS konwoj_group_members (
+      user_id text PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      group_id text NOT NULL REFERENCES konwoj_groups(id) ON DELETE CASCADE,
+      is_treasurer boolean NOT NULL DEFAULT false
+    )`,
+  `ALTER TABLE guild_events ADD COLUMN IF NOT EXISTS konwoj_group_id text REFERENCES konwoj_groups(id) ON DELETE SET NULL`,
+  `CREATE TABLE IF NOT EXISTS konwoj_weeks (
+      group_id text NOT NULL REFERENCES konwoj_groups(id) ON DELETE CASCADE,
+      week_start text NOT NULL,
+      shop_yang_kk double precision NOT NULL DEFAULT 0,
+      shop_items_value_kk double precision NOT NULL DEFAULT 0,
+      updated_by text REFERENCES users(id),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (group_id, week_start)
+    )`,
+  `CREATE TABLE IF NOT EXISTS konwoj_prices (
+      id text PRIMARY KEY,
+      group_id text NOT NULL REFERENCES konwoj_groups(id) ON DELETE CASCADE,
+      name text NOT NULL,
+      market_price_kk double precision,
+      guild_price_kk double precision,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT konwoj_prices_group_name_unique UNIQUE (group_id, name)
+    )`,
+  `CREATE TABLE IF NOT EXISTS konwoj_payouts (
+      group_id text NOT NULL REFERENCES konwoj_groups(id) ON DELETE CASCADE,
+      week_start text NOT NULL,
+      user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      paid_by text REFERENCES users(id),
+      paid_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT konwoj_payouts_group_week_user_unique UNIQUE (group_id, week_start, user_id)
     )`,
 ]
 

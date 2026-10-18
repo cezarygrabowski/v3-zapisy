@@ -1,7 +1,7 @@
 import { warsawWallToDate } from "@/lib/dates"
 import type { ExpeditionHourBlock } from "@/lib/red-las"
 
-export type GuildEventType = "v3" | "red_las" | "dungeon" | "other"
+export type GuildEventType = "v3" | "red_las" | "dungeon" | "konwoj" | "other"
 
 export type RecurrenceType = "none" | "daily" | "weekly" | "weekdays"
 
@@ -243,7 +243,7 @@ export function getEventColorPreset(colorId?: string | null): EventColorPreset {
 
 export const EVENT_TYPE_METADATA: Record<
   GuildEventType,
-  { label: string; icon: string; defaultColor: EventColorId; mode: "v3_spots" | "red_las_spots" | "party" }
+  { label: string; icon: string; defaultColor: EventColorId; mode: "v3_spots" | "red_las_spots" | "party"; hidden?: boolean }
 > = {
   v3: {
     label: "V3",
@@ -261,6 +261,13 @@ export const EVENT_TYPE_METADATA: Record<
     label: "Dungeon",
     icon: "🐉",
     defaultColor: "purple",
+    mode: "party",
+    hidden: true, // not offered for new events; existing ones still render
+  },
+  konwoj: {
+    label: "Konwój Kompanii",
+    icon: "🐍",
+    defaultColor: "yellow",
     mode: "party",
   },
   other: {
@@ -308,6 +315,7 @@ export type EventSignupEntry = {
   spot: string | null
   role: string | null
   attended: boolean
+  hasHorse?: boolean | null
   createdAt: string
 }
 
@@ -323,6 +331,7 @@ export type EventDetails = {
   signupMode: string
   recurrence: string
   maxParticipants: number | null
+  konwojTreasurerIds?: string[]
   description: string | null
   status: "planned" | "active" | "finished" | "cancelled"
   createdById: string

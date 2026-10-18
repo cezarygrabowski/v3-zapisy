@@ -1,12 +1,12 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { calculateDurationHours, type RecurrenceType } from "@/lib/calendar-types"
+import { calculateDurationHours, EVENT_TYPE_METADATA, type GuildEventType, type RecurrenceType } from "@/lib/calendar-types"
 import { addDays, formatDatePl, getTimeUntilEvent, getV3SignupOpenDate, isIsoDate, isV3SelfWithdrawLocked, isV3SignupDateLocked, todayInWarsaw } from "@/lib/dates"
 import { getDb } from "@/lib/db"
 import { getCurrentUser, requireUser } from "@/lib/session"
 import { and, eq } from "drizzle-orm"
-import { guildEventAuditLogs, guildEventSignups, guildEvents, users } from "@/lib/db/schema"
+import { guildEventAuditLogs, guildEventSignups, guildEvents, konwojGroupMembers, konwojGroups, users } from "@/lib/db/schema"
 import { hasV3Access } from "@/lib/permissions"
 import { findUserById } from "@/lib/db/users"
 
@@ -34,11 +34,13 @@ export async function createGuildEvent(input: {
   recurrenceWeeks?: number
   maxParticipants?: number | null
   description?: string
+  konwojGroupId?: string
 }): Promise<ActionResult> {
   const user = await requireUser()
 
   const title = input.title.trim()
   if (!title) return fail("Nazwa nie może być pusta.")
+  if (EVENT_TYPE_METADATA[input.type as GuildEventType]?.hidden) return fail("Ten typ wydarzenia jest wyłączony.")
 
   if (!isIsoDate(input.date)) {
     return fail("Nieprawidłowa data (format RRRR-MM-DD).")
@@ -103,6 +105,21 @@ export async function createGuildEvent(input: {
     : (input.recurrence || "none")
 
   const db = await getDb()
+  let konwojGroupId: string | null = null
+  if (input.type === "konwoj") {
+    if (!input.konwojGroupId) return fail("Wybierz drużynę Konwoju.")
+    const [member] = await db
+      .select({ groupId: konwojGroupMembers.groupId })
+      .from(konwojGroupMembers)
+      .where(eq(konwojGroupMembers.userId, user.id))
+    if (!user.isLeader && member?.groupId !== input.konwojGroupId) {
+      return fail("Możesz planować Konwój tylko dla swojej drużyny.")
+    }
+    const [group] = await db.select({ id: konwojGroups.id }).from(konwojGroups).where(eq(konwojGroups.id, input.konwojGroupId))
+    if (!group) return fail("Nie znaleziono drużyny.")
+    konwojGroupId = group.id
+  }
+
   let firstEventId = ""
 
   for (let i = 0; i < datesToCreate.length; i++) {
@@ -124,12 +141,14 @@ export async function createGuildEvent(input: {
       maxParticipants: maxParts,
       description: input.description?.trim() || null,
       status: "planned",
+      konwojGroupId,
       createdBy: user.id,
     })
   }
 
   revalidatePath("/kalendarz")
   revalidatePath("/")
+  revalidatePath("/konwoj")
 
   const message = datesToCreate.length > 1
     ? `Utworzono serię ${datesToCreate.length} cyklicznych wydarzeń!`
@@ -145,6 +164,7 @@ export async function signUpForGuildEvent(input: {
   hourIndex?: number
   targetUserId?: string
   characterId?: string
+  hasHorse?: boolean
 }): Promise<ActionResult> {
   const user = await requireUser()
   const db = await getDb()
@@ -157,11 +177,23 @@ export async function signUpForGuildEvent(input: {
       type: guildEvents.type,
       date: guildEvents.date,
       maxParticipants: guildEvents.maxParticipants,
+      konwojGroupId: guildEvents.konwojGroupId,
     })
     .from(guildEvents)
     .where(eq(guildEvents.id, input.eventId))
 
   if (!event) return fail("Nie znaleziono wydarzenia.")
+
+  if (event.type === "konwoj") {
+    if (typeof input.hasHorse !== "boolean") return fail("Zaznacz, czy masz konia 30 lvl.")
+    const [member] = await db
+      .select({ groupId: konwojGroupMembers.groupId })
+      .from(konwojGroupMembers)
+      .where(eq(konwojGroupMembers.userId, targetUserId))
+    if (event.konwojGroupId && member?.groupId !== event.konwojGroupId) {
+      return fail("To wejście jest tylko dla członków tej drużyny Konwoju.")
+    }
+  }
 
   // Resolve target user characters
   const { listUserCharacters } = await import("@/lib/actions/characters")
@@ -329,6 +361,7 @@ export async function signUpForGuildEvent(input: {
       spot: input.spot || null,
       role: userRole,
       attended: true,
+      hasHorse: event.type === "konwoj" ? input.hasHorse : null,
     })
   } catch (err) {
     console.error("[signUpForGuildEvent] Insert error:", err)
@@ -620,7 +653,7 @@ export async function transferSpotToUser(input: {
 }
 
 export async function toggleGuildEventAttendance(signupId: string): Promise<ActionResult> {
-  await requireUser()
+  const user = await requireUser()
   const db = await getDb()
 
   const [signup] = await db
@@ -628,11 +661,19 @@ export async function toggleGuildEventAttendance(signupId: string): Promise<Acti
       id: guildEventSignups.id,
       eventId: guildEventSignups.eventId,
       attended: guildEventSignups.attended,
+      isTreasurer: konwojGroupMembers.isTreasurer,
     })
     .from(guildEventSignups)
+    .innerJoin(guildEvents, eq(guildEvents.id, guildEventSignups.eventId))
+    .leftJoin(
+      konwojGroupMembers,
+      and(eq(konwojGroupMembers.groupId, guildEvents.konwojGroupId), eq(konwojGroupMembers.userId, user.id))
+    )
     .where(eq(guildEventSignups.id, signupId))
 
   if (!signup) return fail("Nie znaleziono zapisu.")
+  // Treasurers of a Konwój group mark attendance for their own group's runs.
+  if (!user.isLeader && !signup.isTreasurer) return fail("Tylko lider lub skarbnik drużyny może zmieniać obecność.")
 
   const newStatus = !signup.attended
   await db
@@ -644,6 +685,7 @@ export async function toggleGuildEventAttendance(signupId: string): Promise<Acti
   revalidatePath("/panel")
   revalidatePath("/skladki")
   revalidatePath("/statystyki")
+  revalidatePath("/konwoj")
   return ok(newStatus ? "Obecność potwierdzona!" : "Odznaczono obecność.")
 }
 

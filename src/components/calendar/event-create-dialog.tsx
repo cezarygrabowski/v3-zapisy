@@ -32,12 +32,14 @@ export function EventCreateDialog({
   initialDate,
   initialStartTime,
   initialEndTime,
+  konwojGroups = [],
 }: {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   initialDate?: string
   initialStartTime?: string
   initialEndTime?: string
+  konwojGroups?: { id: string; name: string }[]
 } = {}) {
   const router = useRouter()
   const [internalOpen, setInternalOpen] = useState(false)
@@ -72,6 +74,7 @@ export function EventCreateDialog({
   const [selectedDays, setSelectedDays] = useState<number[]>([]) // 1 = Pon, ..., 7 = Niedz
   const [maxParticipants, setMaxParticipants] = useState<number | "">("")
   const [description, setDescription] = useState("")
+  const [konwojGroupId, setKonwojGroupId] = useState(() => konwojGroups[0]?.id ?? "")
 
   // Update values if initial props change while opening
   const prevInitialRef = useState({ initialDate, initialStartTime, initialEndTime })
@@ -113,14 +116,19 @@ export function EventCreateDialog({
       case "red_las":
         setTitle("Red Las")
         break
-      case "dungeon":
-        setTitle("Dungeon")
+      case "konwoj":
+        setTitle(konwojTitle(konwojGroupId))
         break
       case "other":
       default:
         setTitle("Wydarzenie")
         break
     }
+  }
+
+  function konwojTitle(groupId: string) {
+    const group = konwojGroups.find((g) => g.id === groupId)
+    return group ? `Konwój · ${group.name}` : "Konwój"
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -136,6 +144,7 @@ export function EventCreateDialog({
         recurringDays: selectedDays.length > 0 ? selectedDays : undefined,
         maxParticipants: maxParticipants ? Number(maxParticipants) : null,
         description,
+        konwojGroupId: type === "konwoj" ? konwojGroupId : undefined,
       })
 
       if (!res.ok) {
@@ -174,7 +183,7 @@ export function EventCreateDialog({
                   onChange={(e) => handleTypeChange(e.target.value as GuildEventType)}
                   className="flex h-9 w-full appearance-none rounded-md border border-input bg-background px-3 py-1 pr-9 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer [color-scheme:light] dark:[color-scheme:dark] dark:bg-zinc-900 dark:text-zinc-100"
                 >
-                  {Object.entries(EVENT_TYPE_METADATA).map(([k, v]) => (
+                  {Object.entries(EVENT_TYPE_METADATA).filter(([, v]) => !v.hidden).map(([k, v]) => (
                     <option
                       key={k}
                       value={k}
@@ -297,6 +306,33 @@ export function EventCreateDialog({
                 })}
               </div>
             </Field>
+
+            {type === "konwoj" ? (
+              <Field>
+                <FieldLabel htmlFor="event-konwoj-group">Drużyna</FieldLabel>
+                {konwojGroups.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Nie należysz do żadnej drużyny Konwoju. Admin przypisuje drużyny w zakładce Konwój.
+                  </p>
+                ) : (
+                  <select
+                    id="event-konwoj-group"
+                    value={konwojGroupId}
+                    onChange={(e) => {
+                      setKonwojGroupId(e.target.value)
+                      setTitle(konwojTitle(e.target.value))
+                    }}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs [color-scheme:light] dark:[color-scheme:dark] dark:bg-zinc-900 dark:text-zinc-100"
+                  >
+                    {konwojGroups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+            ) : null}
 
             {isPartyMode ? (
               <Field>

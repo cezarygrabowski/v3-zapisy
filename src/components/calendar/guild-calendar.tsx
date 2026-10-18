@@ -44,6 +44,7 @@ export function GuildCalendar({
   signupAdvanceDays = 2,
   signupOpenTime = "09:00",
   userAllowedAdvanceDays,
+  konwojGroups = [],
 }: {
   events: GuildEventListItem[]
   currentUserId?: string
@@ -56,6 +57,7 @@ export function GuildCalendar({
   signupAdvanceDays?: number
   signupOpenTime?: string
   userAllowedAdvanceDays?: number
+  konwojGroups?: { id: string; name: string }[]
 }) {
   const effectiveAdvanceDays = userAllowedAdvanceDays ?? signupAdvanceDays
   const userIsAdmin = Boolean(isAdmin || isLeader)
@@ -600,7 +602,7 @@ export function GuildCalendar({
         </div>
 
         <div className="flex items-center gap-2">
-          <EventCreateDialog />
+          <EventCreateDialog konwojGroups={konwojGroups} />
           {createModalState.open ? (
             <EventCreateDialog
               open={createModalState.open}
@@ -608,6 +610,7 @@ export function GuildCalendar({
               initialDate={createModalState.date}
               initialStartTime={createModalState.startTime}
               initialEndTime={createModalState.endTime}
+              konwojGroups={konwojGroups}
             />
           ) : null}
         </div>
@@ -646,6 +649,7 @@ export function GuildCalendar({
           {(Object.keys(EVENT_TYPE_METADATA) as GuildEventType[]).map((typeKey) => {
             const meta = EVENT_TYPE_METADATA[typeKey]
             const count = events.filter((e) => e.type === typeKey).length
+            if (meta.hidden && count === 0) return null
             return (
               <Button
                 key={typeKey}

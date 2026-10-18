@@ -13,6 +13,7 @@ import {
   guildEventEnemyReports,
   guildEventSignups,
   guildEvents,
+  konwojGroupMembers,
   users,
 } from "@/lib/db/schema"
 import { getExpeditionHourBlocks } from "@/lib/red-las"
@@ -161,12 +162,20 @@ export async function getGuildEventDetails(
       createdById: guildEvents.createdBy,
       createdByNick: users.gameNick,
       createdAt: guildEvents.createdAt,
+      konwojGroupId: guildEvents.konwojGroupId,
     })
     .from(guildEvents)
     .innerJoin(users, eq(guildEvents.createdBy, users.id))
     .where(eq(guildEvents.id, eventId))
 
   if (!event) return null
+
+  const konwojTreasurers = event.konwojGroupId
+    ? await db
+        .select({ userId: konwojGroupMembers.userId })
+        .from(konwojGroupMembers)
+        .where(and(eq(konwojGroupMembers.groupId, event.konwojGroupId), eq(konwojGroupMembers.isTreasurer, true)))
+    : []
 
   const signupsRows = await db
     .select({
@@ -178,6 +187,7 @@ export async function getGuildEventDetails(
       spot: guildEventSignups.spot,
       role: guildEventSignups.role,
       attended: guildEventSignups.attended,
+      hasHorse: guildEventSignups.hasHorse,
       gameNick: users.gameNick,
       createdAt: guildEventSignups.createdAt,
     })
@@ -197,6 +207,7 @@ export async function getGuildEventDetails(
     spot: s.spot,
     role: s.role,
     attended: s.attended,
+    hasHorse: s.hasHorse,
     createdAt: new Date(s.createdAt).toISOString(),
   }))
 
@@ -256,6 +267,7 @@ export async function getGuildEventDetails(
     signupMode: event.signupMode || "spots",
     recurrence: event.recurrence || "none",
     maxParticipants: event.maxParticipants,
+    konwojTreasurerIds: konwojTreasurers.map((t) => t.userId),
     description: event.description,
     status: computeEventEffectiveStatus(
       event.status,
