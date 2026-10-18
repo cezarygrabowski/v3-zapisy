@@ -55,11 +55,11 @@ function parsePrice(priceKk: number | null): number | null | undefined {
   return Math.round(priceKk * 100) / 100
 }
 
-/** Weekly state: czyste yang na postaci + szacowana wartość itemów na shopie. */
+/** Weekly state: postać zbierająca drop, czyste yang na postaci + szacowana wartość itemów na shopie. */
 export async function setKonwojWeekState(
   groupId: string,
   weekStart: string,
-  input: { yangKk: number; itemsValueKk: number }
+  input: { collectorName: string; yangKk: number; itemsValueKk: number }
 ): Promise<ActionResult> {
   const user = await requireGroupManager(groupId)
   if (typeof user === "string") return fail(user)
@@ -69,9 +69,11 @@ export async function setKonwojWeekState(
   const shopItemsValueKk = parsePrice(input.itemsValueKk)
   if (shopYangKk == null) return fail("Podaj czyste yang w kk.")
   if (shopItemsValueKk == null) return fail("Podaj szacowaną wartość itemów w kk.")
+  const collectorName = input.collectorName.trim() || null
+  if (collectorName && collectorName.length > 40) return fail("Nazwa postaci może mieć max 40 znaków.")
 
   const db = await getDb()
-  const set = { shopYangKk, shopItemsValueKk, updatedBy: user.id, updatedAt: new Date() }
+  const set = { collectorName, shopYangKk, shopItemsValueKk, updatedBy: user.id, updatedAt: new Date() }
   await db
     .insert(konwojWeeks)
     .values({ groupId, weekStart: week, ...set })

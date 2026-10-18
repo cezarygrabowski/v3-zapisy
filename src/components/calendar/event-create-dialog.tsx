@@ -326,7 +326,8 @@ export function EventCreateDialog({
                 <FieldLabel htmlFor="event-konwoj-group">Drużyna</FieldLabel>
                 {konwojGroups.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Brak drużyny Konwoju do wyboru. Drużyny i ich członków ustawia admin w zakładce Konwój.
+                    Brak dostępnych drużyn Konwoju. Admin tworzy drużyny i przypisuje graczy w zakładce Konwój
+                    („Zarządzaj drużynami”).
                   </p>
                 ) : (
                   <select

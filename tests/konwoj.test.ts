@@ -80,7 +80,7 @@ describe("getKonwojWeek", () => {
       s("s7", eOther, u2, true, true), // another group's run
     ])
     await db.insert(konwojWeeks).values([
-      { groupId: gA, weekStart: week, shopYangKk: 200, shopItemsValueKk: 100 },
+      { groupId: gA, weekStart: week, shopYangKk: 200, shopItemsValueKk: 100, collectorName: "Zbieracz" },
       { groupId: gB, weekStart: week, shopYangKk: 999, shopItemsValueKk: 999 },
     ])
   })
@@ -96,6 +96,7 @@ describe("getKonwojWeek", () => {
     const group = (await listKonwojGroups()).find((g) => g.id === gA)!
     const result = await getKonwojWeek(group, week)
     assert.equal(result.poolKk, 300) // 200 yang + 100 estimated items
+    assert.equal(result.collectorName, "Zbieracz")
     assert.deepEqual(
       result.shares.map((s) => [s.userId, s.runs, s.shareKk]),
       [

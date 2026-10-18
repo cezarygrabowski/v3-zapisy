@@ -167,7 +167,8 @@ export async function getKonwojWeek(group: KonwojGroup, weekStart: string) {
   const players = [...userRuns].map(([userId, v]) => ({ userId, gameNick: v.gameNick, runs: v.eventIds.size }))
   const split = splitKonwojPool(poolKk, players, new Set(payouts.map((p) => p.userId)))
 
-  return { weekStart, weekEnd, shopYangKk, itemsValueKk, poolKk, runs: [...runs.values()], ...split }
+  const collectorName = week?.collectorName ?? null
+  return { weekStart, weekEnd, collectorName, shopYangKk, itemsValueKk, poolKk, runs: [...runs.values()], ...split }
 }
 
 export async function listKonwojPrices(groupId: string): Promise<KonwojPrice[]> {

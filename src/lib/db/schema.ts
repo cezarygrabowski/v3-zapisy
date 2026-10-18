@@ -406,6 +406,7 @@ export const konwojWeeks = pgTable(
     weekStart: text("week_start").notNull(),
     shopYangKk: doublePrecision("shop_yang_kk").notNull().default(0), // czyste yang na postaci
     shopItemsValueKk: doublePrecision("shop_items_value_kk").notNull().default(0), // szacunek za itemy na shopie
+    collectorName: text("collector_name"), // postać, na którą w tym tygodniu zbieramy drop
     updatedBy: text("updated_by").references(() => users.id),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

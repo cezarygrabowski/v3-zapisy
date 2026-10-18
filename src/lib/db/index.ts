@@ -7,7 +7,7 @@ type AppDb = {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 } & ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>
 
-const SCHEMA_VERSION = 17
+const SCHEMA_VERSION = 18
 
 const globalForDb = globalThis as unknown as {
   dbPromise?: Promise<AppDb>
@@ -297,6 +297,7 @@ const SCHEMA_SQL = [
       updated_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY (group_id, week_start)
     )`,
+  `ALTER TABLE konwoj_weeks ADD COLUMN IF NOT EXISTS collector_name text`,
   `CREATE TABLE IF NOT EXISTS konwoj_prices (
       id text PRIMARY KEY,
       group_id text NOT NULL REFERENCES konwoj_groups(id) ON DELETE CASCADE,

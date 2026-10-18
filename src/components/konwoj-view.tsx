@@ -35,6 +35,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 type Week = {
   weekStart: string
+  collectorName: string | null
   poolKk: number
   shopYangKk: number
   itemsValueKk: number
@@ -303,6 +304,7 @@ function RunsCard({ week }: { week: Week }) {
 function StateCard({ week, ctx }: { week: Week; ctx: Ctx }) {
   const { pending, run } = useAction()
   const [form, setForm] = useState({
+    collector: week.collectorName ?? "",
     yang: week.shopYangKk ? String(week.shopYangKk) : "",
     items: week.itemsValueKk ? String(week.itemsValueKk) : "",
   })
@@ -311,9 +313,10 @@ function StateCard({ week, ctx }: { week: Week; ctx: Ctx }) {
     e.preventDefault()
     run(() =>
       setKonwojWeekState(ctx.groupId, ctx.weekStart, {
+        collectorName: form.collector,
         yangKk: parseKkInput(form.yang) ?? 0,
         itemsValueKk: parseKkInput(form.items) ?? 0,
-      }),
+      })
     )
   }
 
@@ -325,11 +328,24 @@ function StateCard({ week, ctx }: { week: Week; ctx: Ctx }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <Stat label="Drop zbieramy na postać" value={week.collectorName ?? "— nie ustawiono —"} highlight />
+          </div>
           <Stat label="Czyste yang na postaci" value={formatKk(week.shopYangKk)} />
           <Stat label="Do wyciągnięcia z itemów" value={formatKk(week.itemsValueKk)} />
         </div>
         {ctx.canManage ? (
           <form onSubmit={handleSave} className="flex flex-col gap-2 rounded-lg border bg-muted/10 p-3">
+            <label className="flex flex-col gap-1 text-xs font-medium">
+              Postać zbierająca drop
+              <Input
+                value={form.collector}
+                onChange={(e) => setForm({ ...form, collector: e.target.value })}
+                placeholder="np. Skarbnik1"
+                maxLength={40}
+                className="h-8"
+              />
+            </label>
             <label className="flex flex-col gap-1 text-xs font-medium">
               Czyste yang na postaci (kk)
               <Input
@@ -375,7 +391,7 @@ function PricesCard({ prices, ctx }: { prices: KonwojPrice[]; ctx: Ctx }) {
           marketPriceKk: parseKkInput(draft.market),
           guildPriceKk: parseKkInput(draft.guild),
         }),
-      () => setDraft({ name: "", market: "", guild: "" }),
+      () => setDraft({ name: "", market: "", guild: "" })
     )
   }
 
@@ -492,7 +508,7 @@ function PriceRow({
           marketPriceKk: parseKkInput(form.market),
           guildPriceKk: parseKkInput(form.guild),
         }),
-      () => setEditing(false),
+      () => setEditing(false)
     )
   }
 
@@ -594,7 +610,7 @@ export function KonwojGroupsAdmin({
             e.preventDefault()
             run(
               () => createKonwojGroup(name),
-              () => setName(""),
+              () => setName("")
             )
           }}
           className="flex flex-wrap items-end gap-2"
