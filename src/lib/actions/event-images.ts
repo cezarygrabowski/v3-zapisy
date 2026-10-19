@@ -19,8 +19,9 @@ export async function uploadEventImage(eventId: string, formData: FormData): Pro
   if (file.size > MAX_BYTES) return fail("Plik jest za duży (max 3,5 MB).")
 
   const db = await getDb()
-  const [event] = await db.select({ id: guildEvents.id }).from(guildEvents).where(eq(guildEvents.id, eventId))
+  const [event] = await db.select({ type: guildEvents.type }).from(guildEvents).where(eq(guildEvents.id, eventId))
   if (!event) return fail("Nie znaleziono wydarzenia.")
+  if (event.type !== "konwoj") return fail("Screenshoty dropu można dodawać tylko do Konwoju.")
 
   const [{ total }] = await db
     .select({ total: count() })

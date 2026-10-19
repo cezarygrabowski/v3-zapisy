@@ -1573,7 +1573,7 @@ export function EventDetailDialog({
                   </div>
                 )}
 
-                {event.restrictedAccess ? null : (
+                {event.type === "konwoj" ? (
                   <EventImages
                     eventId={event.id}
                     images={event.images ?? []}
@@ -1581,7 +1581,7 @@ export function EventDetailDialog({
                     isLeader={isLeader}
                     onChange={refreshDetails}
                   />
-                )}
+                ) : null}
 
                 {/* 4. AUDIT LOG SECTION (Visible ONLY to Leaders/Admins) */}
                 {isLeader ? (
