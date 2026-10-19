@@ -319,6 +319,8 @@ export type EventSignupEntry = {
   createdAt: string
 }
 
+export type EventImage = { id: string; uploadedById: string; uploadedByNick: string; createdAt: string }
+
 export type EventDetails = {
   id: string
   title: string
@@ -332,6 +334,7 @@ export type EventDetails = {
   recurrence: string
   maxParticipants: number | null
   konwojTreasurerIds?: string[]
+  images?: EventImage[]
   description: string | null
   status: "planned" | "active" | "finished" | "cancelled"
   createdById: string

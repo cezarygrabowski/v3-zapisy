@@ -11,6 +11,7 @@ import { getDb } from "@/lib/db"
 import {
   guildEventAuditLogs,
   guildEventEnemyReports,
+  guildEventImages,
   guildEventSignups,
   guildEvents,
   konwojGroupMembers,
@@ -177,6 +178,18 @@ export async function getGuildEventDetails(
         .where(and(eq(konwojGroupMembers.groupId, event.konwojGroupId), eq(konwojGroupMembers.isTreasurer, true)))
     : []
 
+  const imageRows = await db
+    .select({
+      id: guildEventImages.id,
+      uploadedById: guildEventImages.uploadedBy,
+      uploadedByNick: users.gameNick,
+      createdAt: guildEventImages.createdAt,
+    })
+    .from(guildEventImages)
+    .innerJoin(users, eq(users.id, guildEventImages.uploadedBy))
+    .where(eq(guildEventImages.eventId, eventId))
+    .orderBy(asc(guildEventImages.createdAt))
+
   const signupsRows = await db
     .select({
       signupId: guildEventSignups.id,
@@ -268,6 +281,7 @@ export async function getGuildEventDetails(
     recurrence: event.recurrence || "none",
     maxParticipants: event.maxParticipants,
     konwojTreasurerIds: konwojTreasurers.map((t) => t.userId),
+    images: imageRows.map((i) => ({ ...i, createdAt: new Date(i.createdAt).toISOString() })),
     description: event.description,
     status: computeEventEffectiveStatus(
       event.status,

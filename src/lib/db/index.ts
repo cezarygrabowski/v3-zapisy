@@ -7,7 +7,7 @@ type AppDb = {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 } & ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>
 
-const SCHEMA_VERSION = 18
+const SCHEMA_VERSION = 19
 
 const globalForDb = globalThis as unknown as {
   dbPromise?: Promise<AppDb>
@@ -315,6 +315,15 @@ const SCHEMA_SQL = [
       paid_at timestamptz NOT NULL DEFAULT now(),
       CONSTRAINT konwoj_payouts_group_week_user_unique UNIQUE (group_id, week_start, user_id)
     )`,
+  `CREATE TABLE IF NOT EXISTS guild_event_images (
+      id text PRIMARY KEY,
+      event_id text NOT NULL REFERENCES guild_events(id) ON DELETE CASCADE,
+      uploaded_by text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      mime_type text NOT NULL,
+      data bytea NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `CREATE INDEX IF NOT EXISTS guild_event_images_event_idx ON guild_event_images(event_id)`,
 ]
 
 async function ensureSchema(db: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }) {

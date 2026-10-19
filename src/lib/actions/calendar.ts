@@ -954,6 +954,7 @@ export async function getGuildEventModalDetails(eventId: string) {
           hourSlots: [],
           signups: [],
           allParticipants: [],
+          images: [],
           restrictedAccess: true,
         }
       }

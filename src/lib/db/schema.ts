@@ -1,5 +1,19 @@
 import { relations, sql } from "drizzle-orm"
-import { boolean, check, doublePrecision, index, integer, pgTable, primaryKey, text, timestamp, unique } from "drizzle-orm/pg-core"
+import {
+  boolean,
+  check,
+  customType,
+  doublePrecision,
+  index,
+  integer,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core"
+
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({ dataType: () => "bytea" })
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -665,3 +679,21 @@ export const v3EnemiesRelations = relations(v3Enemies, ({ one }) => ({
 
 export type V3Enemy = typeof v3Enemies.$inferSelect
 export type NewV3Enemy = typeof v3Enemies.$inferInsert
+
+// Drop screenshots attached to calendar events; stored in the DB so the daily backup covers them.
+export const guildEventImages = pgTable(
+  "guild_event_images",
+  {
+    id: text("id").primaryKey(),
+    eventId: text("event_id")
+      .notNull()
+      .references(() => guildEvents.id, { onDelete: "cascade" }),
+    uploadedBy: text("uploaded_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    mimeType: text("mime_type").notNull(),
+    data: bytea("data").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("guild_event_images_event_idx").on(t.eventId)]
+)

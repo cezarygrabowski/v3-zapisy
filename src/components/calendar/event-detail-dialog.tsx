@@ -33,6 +33,7 @@ import { positionLabel } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 import { SpotTransferDialog } from "@/components/calendar/spot-transfer-dialog"
 import { GiveYellowCardDialog } from "@/components/calendar/give-yellow-card-dialog"
+import { EventImages } from "@/components/calendar/event-images"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -1570,6 +1571,16 @@ export function EventDetailDialog({
                       </div>
                     </div>
                   </div>
+                )}
+
+                {event.restrictedAccess ? null : (
+                  <EventImages
+                    eventId={event.id}
+                    images={event.images ?? []}
+                    currentUserId={currentUserId}
+                    isLeader={isLeader}
+                    onChange={refreshDetails}
+                  />
                 )}
 
                 {/* 4. AUDIT LOG SECTION (Visible ONLY to Leaders/Admins) */}
