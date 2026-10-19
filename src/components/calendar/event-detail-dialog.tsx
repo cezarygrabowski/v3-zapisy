@@ -86,6 +86,7 @@ export function EventDetailDialog({
   const [adminAddUserId, setAdminAddUserId] = useState("")
   const [adminAddChars, setAdminAddChars] = useState<CharacterItem[]>([])
   const [adminAddCharId, setAdminAddCharId] = useState("")
+  const [adminAddHasHorse, setAdminAddHasHorse] = useState<boolean | null>(null)
 
   // Edit properties state (identical to create form)
   const [isEditing, setIsEditing] = useState(false)
@@ -348,6 +349,7 @@ export function EventDetailDialog({
     setAdminAddUserId(userId)
     setAdminAddChars([])
     setAdminAddCharId("")
+    setAdminAddHasHorse(null)
     if (!userId) return
     listUserCharacters(userId)
       .then((chars) => {
@@ -365,6 +367,7 @@ export function EventDetailDialog({
         eventId: event.id,
         targetUserId: adminAddUserId,
         characterId: adminAddCharId || undefined,
+        hasHorse: adminAddHasHorse ?? undefined,
       })
       if (!res.ok) {
         toast.error(res.error)
@@ -1608,7 +1611,7 @@ export function EventDetailDialog({
                         )}
                       </div>
 
-                      {isLeader && event.type !== "konwoj" ? (
+                      {isLeader ? (
                         <form onSubmit={handleAdminAddCharacter} className="rounded-xl border p-4 bg-muted/20 flex flex-col gap-3">
                           <span className="font-heading font-semibold text-sm">Dodaj postać (admin)</span>
                           <Field>
@@ -1644,7 +1647,36 @@ export function EventDetailDialog({
                               </select>
                             </Field>
                           ) : null}
-                          <Button type="submit" size="sm" className="w-full text-xs font-semibold" disabled={pending || !adminAddUserId}>
+                          {event.type === "konwoj" ? (
+                            <Field>
+                              <FieldLabel>Koń 30 lvl</FieldLabel>
+                              <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Koń 30 lvl gracza">
+                                {[
+                                  { value: true, label: "🐎 Ma konia" },
+                                  { value: false, label: "Bez konia" },
+                                ].map((opt) => (
+                                  <Button
+                                    key={opt.label}
+                                    type="button"
+                                    size="sm"
+                                    role="radio"
+                                    aria-checked={adminAddHasHorse === opt.value}
+                                    variant={adminAddHasHorse === opt.value ? "default" : "outline"}
+                                    className="text-xs"
+                                    onClick={() => setAdminAddHasHorse(opt.value)}
+                                  >
+                                    {opt.label}
+                                  </Button>
+                                ))}
+                              </div>
+                            </Field>
+                          ) : null}
+                          <Button
+                            type="submit"
+                            size="sm"
+                            className="w-full text-xs font-semibold"
+                            disabled={pending || !adminAddUserId || (event.type === "konwoj" && adminAddHasHorse === null)}
+                          >
                             {pending ? <Spinner data-icon="inline-start" /> : null}
                             Dodaj do składu
                           </Button>
