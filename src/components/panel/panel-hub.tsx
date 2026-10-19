@@ -11,11 +11,12 @@ import { playMapSound } from "@/lib/panel-audio"
 import { PanelV3View } from "@/components/panel/panel-v3-view"
 import { PanelDefaultView } from "@/components/panel/panel-default-view"
 import { PanelCustomView } from "@/components/panel/panel-custom-view"
+import { PanelKonwojView } from "@/components/panel/panel-konwoj-view"
 import { PanelSoundSettingsDialog } from "@/components/panel/panel-sound-settings"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
-export type PanelTab = "v3" | "default" | "custom"
+export type PanelTab = "v3" | "default" | "custom" | "konwoj"
 const PANEL_TAB_STORAGE_KEY = "v3_panel_active_tab"
 
 export function PanelHub({
@@ -57,7 +58,7 @@ export function PanelHub({
   useEffect(() => {
     try {
       const savedTab = localStorage.getItem(PANEL_TAB_STORAGE_KEY) as PanelTab | null
-      if (savedTab && (savedTab === "default" || savedTab === "custom" || (savedTab === "v3" && hasV3Role))) {
+      if (savedTab && (savedTab === "default" || savedTab === "custom" || savedTab === "konwoj" || (savedTab === "v3" && hasV3Role))) {
         setActiveTab(savedTab)
       } else if (!hasV3Role && savedTab === "v3") {
         setActiveTab("default")
@@ -340,7 +341,7 @@ export function PanelHub({
             ) : null}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Wygodny HUD na boku: aktualna obsada V3, zsynchronizowane timery bossów i widok custom.
+            Wygodny HUD na boku: aktualna obsada V3, zsynchronizowane timery bossów, widok custom i ściągawka Konwoju.
           </p>
         </div>
 
@@ -356,7 +357,7 @@ export function PanelHub({
             <span>Dźwięki</span>
           </Button>
 
-          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border shadow-xs">
+          <div className="flex flex-wrap items-center gap-1 bg-muted/60 p-1 rounded-xl border shadow-xs">
             {hasV3Role && (
               <Button
                 size="sm"
@@ -384,6 +385,15 @@ export function PanelHub({
               onClick={() => handleTabChange("custom")}
             >
               🛠️ Custom
+            </Button>
+
+            <Button
+              size="sm"
+              variant={activeTab === "konwoj" ? "default" : "ghost"}
+              className="h-7 text-xs font-semibold px-2.5"
+              onClick={() => handleTabChange("konwoj")}
+            >
+              🐍 Konwój
             </Button>
           </div>
         </div>
@@ -416,6 +426,8 @@ export function PanelHub({
           now={now}
           onKillRecorded={handleKillRecorded}
         />
+      ) : activeTab === "konwoj" ? (
+        <PanelKonwojView />
       ) : (
         <PanelCustomView
           categories={categories}
