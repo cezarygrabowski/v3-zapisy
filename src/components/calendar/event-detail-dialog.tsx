@@ -13,6 +13,7 @@ import {
   updateGuildEventStatus,
   withdrawFromGuildEvent,
 } from "@/lib/actions/calendar"
+import { listUserCharacters, type CharacterItem } from "@/lib/actions/characters"
 import {
   adminToggleFeeWaived,
   reportV3EnemyRaid,
@@ -80,6 +81,11 @@ export function EventDetailDialog({
   // Party signup role
   const [partyRole, setPartyRole] = useState("")
   const [partyHasHorse, setPartyHasHorse] = useState<boolean | null>(null)
+
+  // Leader adding another player's character to a party event
+  const [adminAddUserId, setAdminAddUserId] = useState("")
+  const [adminAddChars, setAdminAddChars] = useState<CharacterItem[]>([])
+  const [adminAddCharId, setAdminAddCharId] = useState("")
 
   // Edit properties state (identical to create form)
   const [isEditing, setIsEditing] = useState(false)
@@ -334,6 +340,38 @@ export function EventDetailDialog({
       toast.success(res.message)
       setPartyRole("")
       setPartyHasHorse(null)
+      refreshDetails()
+    })
+  }
+
+  function handleAdminAddUserChange(userId: string) {
+    setAdminAddUserId(userId)
+    setAdminAddChars([])
+    setAdminAddCharId("")
+    if (!userId) return
+    listUserCharacters(userId)
+      .then((chars) => {
+        setAdminAddChars(chars)
+        setAdminAddCharId((chars.find((c) => c.isMain) ?? chars[0])?.id ?? "")
+      })
+      .catch(() => toast.error("Nie udało się pobrać postaci gracza."))
+  }
+
+  function handleAdminAddCharacter(e: React.FormEvent) {
+    e.preventDefault()
+    if (!event || !adminAddUserId) return
+    startTransition(async () => {
+      const res = await signUpForGuildEvent({
+        eventId: event.id,
+        targetUserId: adminAddUserId,
+        characterId: adminAddCharId || undefined,
+      })
+      if (!res.ok) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(res.message)
+      handleAdminAddUserChange("")
       refreshDetails()
     })
   }
@@ -1569,6 +1607,49 @@ export function EventDetailDialog({
                           </form>
                         )}
                       </div>
+
+                      {isLeader && event.type !== "konwoj" ? (
+                        <form onSubmit={handleAdminAddCharacter} className="rounded-xl border p-4 bg-muted/20 flex flex-col gap-3">
+                          <span className="font-heading font-semibold text-sm">Dodaj postać (admin)</span>
+                          <Field>
+                            <FieldLabel htmlFor="modal-admin-add-user">Gracz</FieldLabel>
+                            <select
+                              id="modal-admin-add-user"
+                              value={adminAddUserId}
+                              onChange={(e) => handleAdminAddUserChange(e.target.value)}
+                              className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer [color-scheme:light] dark:[color-scheme:dark] dark:bg-zinc-900 dark:text-zinc-100"
+                            >
+                              <option value="">— wybierz gracza —</option>
+                              {allGuildUsers.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.gameNick}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                          {adminAddChars.length > 0 ? (
+                            <Field>
+                              <FieldLabel htmlFor="modal-admin-add-char">Postać</FieldLabel>
+                              <select
+                                id="modal-admin-add-char"
+                                value={adminAddCharId}
+                                onChange={(e) => setAdminAddCharId(e.target.value)}
+                                className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer [color-scheme:light] dark:[color-scheme:dark] dark:bg-zinc-900 dark:text-zinc-100"
+                              >
+                                {adminAddChars.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name} ({c.playstyle.toUpperCase()}){c.isMain ? " — główna" : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                          ) : null}
+                          <Button type="submit" size="sm" className="w-full text-xs font-semibold" disabled={pending || !adminAddUserId}>
+                            {pending ? <Spinner data-icon="inline-start" /> : null}
+                            Dodaj do składu
+                          </Button>
+                        </form>
+                      ) : null}
                     </div>
                   </div>
                 )}

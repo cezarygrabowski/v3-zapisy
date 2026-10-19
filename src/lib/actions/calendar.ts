@@ -215,9 +215,11 @@ export async function signUpForGuildEvent(input: {
 
   const today = todayInWarsaw(new Date())
   const isEventDay = event.date === today
+  // Leaders adding someone else's character skip the event-day-only rules below.
+  const isLeaderAssign = user.isLeader && targetUserId !== user.id
 
   // Rule: Non-main character can ONLY be signed up on the day of the event
-  if (!selectedChar.isMain && !isEventDay) {
+  if (!selectedChar.isMain && !isEventDay && !isLeaderAssign) {
     return fail(
       `Tą postacią („${selectedChar.name}”) możesz zapisać się wyłącznie w dniu wydarzenia (od godz. 00:00). Dzięki temu nie blokujesz miejsc innym graczom z wyprzedzeniem.`
     )
@@ -315,7 +317,7 @@ export async function signUpForGuildEvent(input: {
 
   // B: If user already has a spot on this event and is trying to take a 2nd spot
   if (existingUserSignups.length > 0) {
-    if (!isEventDay) {
+    if (!isEventDay && !isLeaderAssign) {
       return fail(
         `Zajmujesz już jedno miejsce na to wydarzenie (${existingUserSignups[0].spot || "zapisany"}). Zapis na drugą postać jest możliwy wyłącznie w dniu trwania wydarzenia.`
       )
