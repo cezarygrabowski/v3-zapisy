@@ -41,6 +41,7 @@ type Week = {
   itemsValueKk: number
   runs: KonwojRun[]
   shares: KonwojShare[]
+  unassigned: { userId: string; gameNick: string; runs: number }[]
   totalRuns: number
   leftoverKk: number
 }
@@ -181,6 +182,14 @@ function SettlementCard({ week, ctx, currentUserId }: { week: Week; ctx: Ctx; cu
             value={week.totalRuns ? formatKk(Math.floor(week.poolKk / week.totalRuns)) : "—"}
           />
         </div>
+
+        {ctx.canManage && week.unassigned.length ? (
+          <p className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+            Byli na wejściach, ale nie są w drużynie:{" "}
+            <strong>{week.unassigned.map((u) => `${u.gameNick} (${u.runs})`).join(", ")}</strong>. Nie dostają doli,
+            dopóki admin nie przypisze ich w „Zarządzaj drużynami” — wtedy ich wejścia z tego tygodnia się doliczą.
+          </p>
+        ) : null}
 
         {week.shares.length === 0 ? (
           <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">

@@ -133,8 +133,10 @@ export async function getKonwojWeek(group: KonwojGroup, weekStart: string) {
   ])
 
   const runs = new Map<string, KonwojRun>()
+  // Only current members share the pool, whenever they were assigned: their earlier runs this week count too.
   // Every member is listed (0 runs = 0 kk); a player with two characters in one run still counts once.
   const userRuns = new Map(group.members.map((m) => [m.userId, { gameNick: m.gameNick, eventIds: new Set<string>() }]))
+  const unassignedRuns = new Map<string, { gameNick: string; eventIds: Set<string> }>()
 
   for (const row of rows) {
     const run =
@@ -156,9 +158,10 @@ export async function getKonwojWeek(group: KonwojGroup, weekStart: string) {
     if (row.hasHorse) run.horses++
     if (!row.attended) continue
     run.attended++
-    const entry = userRuns.get(row.userId) ?? { gameNick: row.gameNick ?? "Gracz", eventIds: new Set<string>() }
+    const target = userRuns.has(row.userId) ? userRuns : unassignedRuns
+    const entry = target.get(row.userId) ?? { gameNick: row.gameNick ?? "Gracz", eventIds: new Set<string>() }
     entry.eventIds.add(row.eventId)
-    userRuns.set(row.userId, entry)
+    target.set(row.userId, entry)
   }
 
   const shopYangKk = week?.shopYangKk ?? 0
@@ -167,8 +170,21 @@ export async function getKonwojWeek(group: KonwojGroup, weekStart: string) {
   const players = [...userRuns].map(([userId, v]) => ({ userId, gameNick: v.gameNick, runs: v.eventIds.size }))
   const split = splitKonwojPool(poolKk, players, new Set(payouts.map((p) => p.userId)))
 
+  // Attended this group's runs but not assigned to it yet: not paid until the admin assigns them.
+  const unassigned = [...unassignedRuns].map(([userId, v]) => ({ userId, gameNick: v.gameNick, runs: v.eventIds.size }))
+
   const collectorName = week?.collectorName ?? null
-  return { weekStart, weekEnd, collectorName, shopYangKk, itemsValueKk, poolKk, runs: [...runs.values()], ...split }
+  return {
+    weekStart,
+    weekEnd,
+    collectorName,
+    shopYangKk,
+    itemsValueKk,
+    poolKk,
+    runs: [...runs.values()],
+    unassigned,
+    ...split,
+  }
 }
 
 export async function listKonwojPrices(groupId: string): Promise<KonwojPrice[]> {

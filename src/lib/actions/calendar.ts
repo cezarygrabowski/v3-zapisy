@@ -180,7 +180,6 @@ export async function signUpForGuildEvent(input: {
       endTime: guildEvents.endTime,
       durationHours: guildEvents.durationHours,
       maxParticipants: guildEvents.maxParticipants,
-      konwojGroupId: guildEvents.konwojGroupId,
     })
     .from(guildEvents)
     .where(eq(guildEvents.id, input.eventId))
@@ -191,14 +190,8 @@ export async function signUpForGuildEvent(input: {
     if (!user.isLeader && isKonwojSignupClosed(event.type, event.date, event.startTime, event.endTime, event.durationHours)) {
       return fail("Ten Konwój już się zakończył — zapisy są zamknięte.")
     }
+    // Anyone can sign up; the admin assigns players to groups later and past runs count retroactively.
     if (typeof input.hasHorse !== "boolean") return fail("Zaznacz, czy masz konia 30 lvl.")
-    const [member] = await db
-      .select({ groupId: konwojGroupMembers.groupId })
-      .from(konwojGroupMembers)
-      .where(eq(konwojGroupMembers.userId, targetUserId))
-    if (event.konwojGroupId && member?.groupId !== event.konwojGroupId) {
-      return fail("To wejście jest tylko dla członków tej drużyny Konwoju.")
-    }
   }
 
   // Resolve target user characters

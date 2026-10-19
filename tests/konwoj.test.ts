@@ -36,14 +36,14 @@ describe("splitKonwojPool", () => {
 describe("getKonwojWeek", () => {
   const ts = Date.now()
   const week = "2001-01-01" // Monday far in the past so it never shows in the real UI
-  const [u1, u2, u3] = [`konwoj-u1-${ts}`, `konwoj-u2-${ts}`, `konwoj-u3-${ts}`]
+  const [u1, u2, u3, u4] = [`konwoj-u1-${ts}`, `konwoj-u2-${ts}`, `konwoj-u3-${ts}`, `konwoj-u4-${ts}`]
   const [gA, gB] = [`konwoj-ga-${ts}`, `konwoj-gb-${ts}`]
   const [e1, e2, eCancelled, eV3, eOther] = ["e1", "e2", "ec", "ev3", "eb"].map((k) => `konwoj-${k}-${ts}`)
 
   test.before(async () => {
     const db = await getDb()
     await db.insert(users).values(
-      [u1, u2, u3].map((id, i) => ({ id, discordName: `k${i}_${ts}`, gameNick: `Konwoj${i + 1}_${ts}`, isVerified: true }))
+      [u1, u2, u3, u4].map((id, i) => ({ id, discordName: `k${i}_${ts}`, gameNick: `Konwoj${i + 1}_${ts}`, isVerified: true }))
     )
     await db.insert(konwojGroups).values([
       { id: gA, name: `A_${ts}` },
@@ -78,6 +78,7 @@ describe("getKonwojWeek", () => {
       s("s5", eCancelled, u2, true, true),
       s("s6", eV3, u2, true, true),
       s("s7", eOther, u2, true, true), // another group's run
+      s("s8", e1, u4, true, true), // came on Monday before being assigned to any group
     ])
     await db.insert(konwojWeeks).values([
       { groupId: gA, weekStart: week, shopYangKk: 200, shopItemsValueKk: 100, collectorName: "Zbieracz" },
@@ -89,7 +90,7 @@ describe("getKonwojWeek", () => {
     const db = await getDb()
     await db.delete(guildEvents).where(inArray(guildEvents.id, [e1, e2, eCancelled, eV3, eOther]))
     await db.delete(konwojGroups).where(inArray(konwojGroups.id, [gA, gB]))
-    await db.delete(users).where(inArray(users.id, [u1, u2, u3]))
+    await db.delete(users).where(inArray(users.id, [u1, u2, u3, u4]))
   })
 
   test("splits yang + estimated item value within the group by distinct attended runs", async () => {
@@ -105,11 +106,29 @@ describe("getKonwojWeek", () => {
         [u3, 0, 0],
       ]
     )
+    assert.deepEqual(result.unassigned, [{ userId: u4, gameNick: `Konwoj4_${ts}`, runs: 1 }])
     assert.deepEqual(
       result.runs.map((r) => [r.id, r.signups, r.attended, r.horses]),
       [
-        [e1, 3, 2, 2],
+        [e1, 4, 3, 3],
         [e2, 2, 2, 1],
+      ]
+    )
+  })
+
+  test("counts earlier runs of a player assigned to the group later in the week", async () => {
+    const db = await getDb()
+    await db.insert(konwojGroupMembers).values({ userId: u4, groupId: gA })
+    const group = (await listKonwojGroups()).find((g) => g.id === gA)!
+    const result = await getKonwojWeek(group, week)
+    assert.deepEqual(result.unassigned, [])
+    assert.deepEqual(
+      result.shares.map((s) => [s.userId, s.runs, s.shareKk]),
+      [
+        [u1, 2, 150],
+        [u2, 1, 75],
+        [u4, 1, 75],
+        [u3, 0, 0],
       ]
     )
   })
