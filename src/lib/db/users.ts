@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import { envLeaderDiscordIds } from "@/lib/constants"
 import { getDb } from "@/lib/db"
 import { userCharacters, users, type User } from "@/lib/db/schema"
@@ -98,7 +98,11 @@ export async function upsertDevUser(name: string, isLeader: boolean): Promise<Us
 
 export async function findUserById(id: string): Promise<User | null> {
   const db = await getDb()
-  const [row] = await db.select().from(users).where(eq(users.id, id)).limit(1)
+  const [row] = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.id, id), isNull(users.deletedAt)))
+    .limit(1)
   return row ?? null
 }
 

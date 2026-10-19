@@ -27,6 +27,8 @@ export const users = pgTable("users", {
   isVerified: boolean("is_verified").notNull().default(false),
   roles: text("roles").notNull().default("[]"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Deleted accounts stay as rows so their nick remains in fees, signups and audit history.
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 })
 
 export const userCharacters = pgTable("user_characters", {

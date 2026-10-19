@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, inArray, ne } from "drizzle-orm"
+import { and, desc, eq, gte, ilike, inArray, isNull, ne } from "drizzle-orm"
 import {
   POSITIONS,
   PVM_FEE_KK,
@@ -103,7 +103,7 @@ export async function getDayGrid(date: string) {
 
 export async function listUsers(): Promise<User[]> {
   const db = await getDb()
-  return db.select().from(users).orderBy(users.gameNick)
+  return db.select().from(users).where(isNull(users.deletedAt)).orderBy(users.gameNick)
 }
 
 export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {

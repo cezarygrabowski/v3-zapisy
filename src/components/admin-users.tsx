@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
   createUser,
+  deleteUser,
   setLeader,
   setPlaystyle,
   setUserPassword,
@@ -232,6 +233,25 @@ export function AdminUsers({
                     <Button size="sm" variant="outline" className="h-8 text-xs cursor-pointer" onClick={() => setPasswordUser(user)}>
                       Hasło
                     </Button>
+                    {user.id !== currentUserId ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs cursor-pointer text-destructive hover:text-destructive"
+                        disabled={pending}
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Usunąć konto ${user.gameNick}? Gracz nie zaloguje się już na nie, zniknie z list i z przyszłych zapisów. Jego nick zostanie w historii.`
+                            )
+                          ) {
+                            run(() => deleteUser(user.id))
+                          }
+                        }}
+                      >
+                        Usuń
+                      </Button>
+                    ) : null}
                   </div>
                 </TableCell>
               </TableRow>

@@ -1,10 +1,11 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, eq, ilike, isNull, ne, or, sql } from "drizzle-orm"
+import { and, eq, gte, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm"
 import { isPlaystyle } from "@/lib/constants"
 import { getDb, isUniqueViolation } from "@/lib/db"
-import { guildEventSignups, guildSettings, userCharacters, users } from "@/lib/db/schema"
+import { guildEvents, guildEventSignups, guildSettings, konwojGroupMembers, userCharacters, users } from "@/lib/db/schema"
+import { todayInWarsaw } from "@/lib/dates"
 import { createPasswordUser, findUserById } from "@/lib/db/users"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
 import { hashPassword, parseLogin, parsePassword } from "@/lib/password"
@@ -378,6 +379,50 @@ export async function setUserVerified(userId: string, isVerified: boolean): Prom
   revalidatePath("/", "layout")
   revalidatePath("/admin")
   return ok(isVerified ? "Użytkownik został zweryfikowany." : "Cofnięto weryfikację użytkownika.")
+}
+
+/**
+ * Soft-deletes an account: it can't log in and leaves every list, but its rows stay so history keeps the nick.
+ * A hard delete would cascade away penalties, Konwój payouts and screenshots.
+ */
+export async function deleteUser(userId: string): Promise<ActionResult> {
+  const actor = await requireLeader()
+  if (userId === actor.id) return fail("Nie możesz usunąć własnego konta.")
+  const db = await getDb()
+  const target = await db.query.users.findFirst({ where: and(eq(users.id, userId), isNull(users.deletedAt)) })
+  if (!target) return fail("Nie znaleziono użytkownika.")
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({
+        deletedAt: new Date(),
+        discordId: null, // the same Discord account can register again as a fresh account
+        login: null,
+        passwordHash: null,
+        isLeader: false,
+        isVerified: false,
+        roles: "[]",
+      })
+      .where(eq(users.id, userId))
+    await tx.delete(konwojGroupMembers).where(eq(konwojGroupMembers.userId, userId))
+    // Free spots in upcoming events; past signups stay as history.
+    await tx
+      .delete(guildEventSignups)
+      .where(
+        and(
+          eq(guildEventSignups.userId, userId),
+          inArray(
+            guildEventSignups.eventId,
+            tx.select({ id: guildEvents.id }).from(guildEvents).where(gte(guildEvents.date, todayInWarsaw()))
+          )
+        )
+      )
+  })
+
+  revalidatePath("/", "layout")
+  revalidatePath("/admin")
+  return ok(`Usunięto konto ${target.gameNick}.`)
 }
 
 export async function setUserRoles(userId: string, roles: string[]): Promise<ActionResult> {

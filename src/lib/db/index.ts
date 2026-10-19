@@ -7,7 +7,7 @@ type AppDb = {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 } & ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>
 
-const SCHEMA_VERSION = 19
+const SCHEMA_VERSION = 20
 
 const globalForDb = globalThis as unknown as {
   dbPromise?: Promise<AppDb>
@@ -34,6 +34,7 @@ const SCHEMA_SQL = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash text`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified boolean NOT NULL DEFAULT false`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS roles text NOT NULL DEFAULT '[]'`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`,
   `UPDATE users SET is_verified = true WHERE is_leader = true OR is_verified IS NULL`,
   `CREATE UNIQUE INDEX IF NOT EXISTS users_login_unique ON users (login)`,
   `CREATE TABLE IF NOT EXISTS signups (
