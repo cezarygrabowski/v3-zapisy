@@ -77,22 +77,25 @@ export function PanelHub({
     return () => clearInterval(interval)
   }, [])
 
-  // Automatic server refresh for boss timers when not on V3 tab
+  // Boss timers only matter on the Domyślny and Custom tabs
+  const showsBossTimers = activeTab === "default" || activeTab === "custom"
+
+  // Automatic server refresh for boss timers
   useEffect(() => {
-    if (activeTab === "v3") return
+    if (!showsBossTimers) return
     const interval = setInterval(() => {
       if (!document.hidden) {
         router.refresh()
       }
     }, 15000)
     return () => clearInterval(interval)
-  }, [router, activeTab])
+  }, [router, showsBossTimers])
 
   // Real-time audio alert per map when any channel enters the respawn window
   // Scoped to active tab: V3 ignores boss timers, Custom filters by selection
   useEffect(() => {
-    // V3 tab has its own audio alerts via RunTimers – skip boss timer alerts
-    if (activeTab === "v3") return
+    // V3 tab has its own audio alerts via RunTimers, Konwój is a static cheat sheet
+    if (!showsBossTimers) return
 
     let filteredCategories = categories
 
@@ -131,7 +134,7 @@ export function PanelHub({
         }
       }
     }
-  }, [activeTab, categories, now])
+  }, [activeTab, showsBossTimers, categories, now])
 
   // Real-time dynamic browser tab title showing closest upcoming/active timer from the ACTIVE view
   useEffect(() => {
@@ -206,7 +209,7 @@ export function PanelHub({
           })
         }
       }
-    } else {
+    } else if (showsBossTimers) {
       // Widok Domyślny lub Custom
       let filteredCategories = categories
 
@@ -277,6 +280,8 @@ export function PanelHub({
     } else {
       if (activeTab === "v3") {
         document.title = "🕷️ [V3] ElderHub"
+      } else if (activeTab === "konwoj") {
+        document.title = "🐍 [Konwój] ElderHub"
       } else {
         document.title = "ElderHub | Panel"
       }
@@ -285,7 +290,7 @@ export function PanelHub({
     return () => {
       document.title = "ElderHub | Panel"
     }
-  }, [activeTab, categories, syncs, v3Kills, now])
+  }, [activeTab, showsBossTimers, categories, syncs, v3Kills, now])
 
   function handleTabChange(tab: PanelTab) {
     setActiveTab(tab)
@@ -302,7 +307,7 @@ export function PanelHub({
 
   // Calculate quick stats for header badge – scoped to active view
   let windowCount = 0
-  if (activeTab !== "v3") {
+  if (showsBossTimers) {
     let filteredTimers = categories.flatMap((c) => c.timers)
     if (activeTab === "custom") {
       try {
@@ -347,15 +352,17 @@ export function PanelHub({
 
         {/* View switcher buttons & Sound settings */}
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 text-xs font-medium gap-1.5 px-3 border-border/80 shadow-xs"
-            onClick={() => setSoundSettingsOpen(true)}
-          >
-            <span>🔊</span>
-            <span>Dźwięki</span>
-          </Button>
+          {activeTab !== "konwoj" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs font-medium gap-1.5 px-3 border-border/80 shadow-xs"
+              onClick={() => setSoundSettingsOpen(true)}
+            >
+              <span>🔊</span>
+              <span>Dźwięki</span>
+            </Button>
+          )}
 
           <div className="flex flex-wrap items-center gap-1 bg-muted/60 p-1 rounded-xl border shadow-xs">
             {hasV3Role && (
