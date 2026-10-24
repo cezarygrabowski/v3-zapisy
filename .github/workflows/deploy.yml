@@ -47,6 +47,7 @@ jobs:
           cp -r public .next/standalone/
           cp -r .next/static .next/standalone/.next/
           cp -r deploy .next/standalone/
+          cp -r scripts .next/standalone/
           tar -czf release.tar.gz -C .next/standalone .
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

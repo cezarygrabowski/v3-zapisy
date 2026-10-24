@@ -1641,7 +1641,7 @@ export function EventDetailDialog({
                               >
                                 {adminAddChars.map((c) => (
                                   <option key={c.id} value={c.id}>
-                                    {c.name} ({c.playstyle.toUpperCase()}){c.isMain ? " — główna" : ""}
+                                    {c.name} ({c.playstyle?.toUpperCase() ?? "bez V3"}){c.isMain ? " — główna" : ""}
                                   </option>
                                 ))}
                               </select>

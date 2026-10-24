@@ -6,13 +6,13 @@ import { toast } from "sonner"
 import {
   createUser,
   deleteUser,
-  setLeader,
   setPlaystyle,
   setUserPassword,
   setUserRoles,
   setUserVerified,
   toggleUserRole,
 } from "@/lib/actions/admin"
+import { setAdminGuilds } from "@/lib/actions/guilds"
 import { startImpersonation } from "@/lib/actions/impersonation"
 import { PREDEFINED_ROLES } from "@/lib/constants"
 import { getUserRoles } from "@/lib/permissions"
@@ -48,6 +48,8 @@ type Row = {
   hasDiscord: boolean
   playstyle: string | null
   isLeader: boolean
+  isSuperAdmin: boolean
+  adminGuildIds: string[]
   isVerified: boolean
   roles: string
 }
@@ -55,9 +57,13 @@ type Row = {
 export function AdminUsers({
   users,
   currentUserId,
+  isSuperAdmin = false,
+  guilds = [],
 }: {
   users: Row[]
   currentUserId?: string
+  isSuperAdmin?: boolean
+  guilds?: { id: string; name: string }[]
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -208,12 +214,7 @@ export function AdminUsers({
                   ) : null}
                 </TableCell>
                 <TableCell>
-                  <Switch
-                    checked={user.isLeader}
-                    disabled={pending}
-                    onCheckedChange={(checked) => run(() => setLeader(user.id, checked))}
-                    aria-label={`Admin ${user.gameNick}`}
-                  />
+                  <AdminCell user={user} guilds={guilds} canGrant={isSuperAdmin} pending={pending} run={run} />
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1.5">
@@ -309,6 +310,57 @@ export function AdminUsers({
   )
 }
 
+/** Only the super admin grants admin, always for chosen guilds; others just see who is admin of what. */
+function AdminCell({
+  user,
+  guilds,
+  canGrant,
+  pending,
+  run,
+}: {
+  user: Row
+  guilds: { id: string; name: string }[]
+  canGrant: boolean
+  pending: boolean
+  run: (action: () => Promise<{ ok: true; message?: string } | { ok: false; error: string }>) => void
+}) {
+  if (user.isSuperAdmin) return <Badge>Super admin</Badge>
+  const names = guilds.filter((g) => user.adminGuildIds.includes(g.id)).map((g) => g.name)
+  if (!canGrant) {
+    if (!user.isLeader) return <span className="text-xs text-muted-foreground">—</span>
+    return <Badge variant="secondary">{names.length ? `Admin: ${names.join(", ")}` : "Admin (bez gildii)"}</Badge>
+  }
+  if (!guilds.length && !user.isLeader)
+    return <span className="text-xs text-muted-foreground">Najpierw dodaj gildię</span>
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <ToggleGroup
+        multiple
+        value={user.adminGuildIds}
+        onValueChange={(value) => run(() => setAdminGuilds(user.id, value))}
+        spacing={1}
+        size="sm"
+        disabled={pending}
+        aria-label={`Admin ${user.gameNick} w gildiach`}
+      >
+        {guilds.map((g) => (
+          <ToggleGroupItem key={g.id} value={g.id}>
+            {g.name}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      {user.isLeader && !user.adminGuildIds.length ? (
+        <>
+          <Badge variant="outline">Admin (bez gildii)</Badge>
+          <Button size="xs" variant="ghost" disabled={pending} onClick={() => run(() => setAdminGuilds(user.id, []))}>
+            Zabierz
+          </Button>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
 function CreateUserDialog({
   open,
   pending,
@@ -323,14 +375,12 @@ function CreateUserDialog({
     login: string
     password: string
     playstyle: string
-    isLeader: boolean
   }) => void
 }) {
   const [nick, setNick] = useState("")
   const [login, setLogin] = useState("")
   const [password, setPassword] = useState("")
   const [playstyle, setPlaystyle] = useState<string>("pvp")
-  const [isLeader, setIsLeader] = useState(false)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -373,16 +423,6 @@ function CreateUserDialog({
               <ToggleGroupItem value="pvm">PVM</ToggleGroupItem>
             </ToggleGroup>
           </Field>
-          <Field orientation="horizontal">
-            <Switch
-              checked={isLeader}
-              onCheckedChange={setIsLeader}
-              id="new-admin"
-            />
-            <FieldLabel htmlFor="new-admin" className="font-normal">
-              Admin
-            </FieldLabel>
-          </Field>
         </FieldGroup>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -391,7 +431,7 @@ function CreateUserDialog({
           <Button
             disabled={pending}
             onClick={() =>
-              onCreate({ gameNick: nick, login, password, playstyle, isLeader })
+              onCreate({ gameNick: nick, login, password, playstyle })
             }
           >
             {pending ? <Spinner data-icon="inline-start" /> : null}

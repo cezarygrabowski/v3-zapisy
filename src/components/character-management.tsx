@@ -9,6 +9,7 @@ import {
   updateCharacter,
   type CharacterItem,
 } from "@/lib/actions/characters"
+import type { Playstyle } from "@/lib/constants"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -37,17 +38,19 @@ export function CharacterManagement({
 
   // Form states
   const [newName, setNewName] = useState("")
-  const [newPlaystyle, setNewPlaystyle] = useState<"pvp" | "pvm">("pvm")
+  const [newPlaystyle, setNewPlaystyle] = useState<Playstyle | null>(null)
+  const [newDescription, setNewDescription] = useState("")
 
   const [editName, setEditName] = useState("")
-  const [editPlaystyle, setEditPlaystyle] = useState<"pvp" | "pvm">("pvm")
+  const [editPlaystyle, setEditPlaystyle] = useState<Playstyle | null>(null)
+  const [editDescription, setEditDescription] = useState("")
 
   const [pending, startTransition] = useTransition()
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     startTransition(async () => {
-      const res = await addCharacter({ name: newName, playstyle: newPlaystyle })
+      const res = await addCharacter({ name: newName, playstyle: newPlaystyle, description: newDescription })
       if (!res.ok) {
         toast.error(res.error)
         return
@@ -57,7 +60,8 @@ export function CharacterManagement({
         setCharacters((prev) => [...prev, res.data.character])
       }
       setNewName("")
-      setNewPlaystyle("pvm")
+      setNewPlaystyle(null)
+      setNewDescription("")
       setIsAddOpen(false)
     })
   }
@@ -70,6 +74,7 @@ export function CharacterManagement({
         characterId: editingChar.id,
         name: editName,
         playstyle: editPlaystyle,
+        description: editDescription,
       })
       if (!res.ok) {
         toast.error(res.error)
@@ -78,7 +83,7 @@ export function CharacterManagement({
       toast.success(res.message)
       setCharacters((prev) =>
         prev.map((c) =>
-          c.id === editingChar.id ? { ...c, name: editName, playstyle: editPlaystyle } : c
+          c.id === editingChar.id ? { ...c, name: editName, playstyle: editPlaystyle, description: editDescription.trim() } : c
         )
       )
       setEditingChar(null)
@@ -140,7 +145,8 @@ export function CharacterManagement({
             className="gap-1.5 shrink-0 self-start sm:self-auto text-xs"
             onClick={() => {
               setNewName("")
-              setNewPlaystyle("pvm")
+              setNewPlaystyle(null)
+              setNewDescription("")
               setIsAddOpen(true)
             }}
             disabled={pending}
@@ -195,17 +201,24 @@ export function CharacterManagement({
                         Dodatkowa
                       </Badge>
                     )}
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] h-4.5 px-1.5 font-semibold ${
-                        char.playstyle === "pvp"
-                          ? "border-blue-500/40 text-blue-600 dark:text-blue-400 bg-blue-500/10"
-                          : "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
-                      }`}
-                    >
-                      {char.playstyle.toUpperCase()} · {char.playstyle === "pvp" ? "3 kk" : "7 kk"}
-                    </Badge>
+                    {char.playstyle ? (
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] h-4.5 px-1.5 font-semibold ${
+                          char.playstyle === "pvp"
+                            ? "border-blue-500/40 text-blue-600 dark:text-blue-400 bg-blue-500/10"
+                            : "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                        }`}
+                      >
+                        V3: {char.playstyle.toUpperCase()} · {char.playstyle === "pvp" ? "3 kk" : "7 kk"}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] h-4.5 px-1.5 font-medium text-muted-foreground">
+                        bez V3
+                      </Badge>
+                    )}
                   </div>
+                  {char.description ? <span className="text-xs truncate">{char.description}</span> : null}
                   <span className="text-[11px] text-muted-foreground truncate">
                     {char.isMain
                       ? "Standardowe zapisy z wyprzedzeniem (np. 2 dni przed)"
@@ -238,6 +251,7 @@ export function CharacterManagement({
                     setEditingChar(char)
                     setEditName(char.name)
                     setEditPlaystyle(char.playstyle)
+                    setEditDescription(char.description)
                   }}
                   disabled={pending}
                 >
@@ -288,20 +302,28 @@ export function CharacterManagement({
               </Field>
 
               <Field>
-                <FieldLabel>Typ postaci</FieldLabel>
+                <FieldLabel htmlFor="new-character-description">Krótki opis (opcjonalnie)</FieldLabel>
+                <Input
+                  id="new-character-description"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="np. mój dropek do m2"
+                  maxLength={60}
+                />
+              </Field>
+
+              <Field>
+                <FieldLabel>Składka na V3 (opcjonalnie)</FieldLabel>
                 <ToggleGroup
-                  value={[newPlaystyle]}
-                  onValueChange={(val) => {
-                    const next = val[0] as "pvp" | "pvm" | undefined
-                    if (next) setNewPlaystyle(next)
-                  }}
+                  value={newPlaystyle ? [newPlaystyle] : []}
+                  onValueChange={(val) => setNewPlaystyle((val[0] as Playstyle | undefined) ?? null)}
                   spacing={2}
                 >
                   <ToggleGroupItem value="pvp">PVP · 3 kk</ToggleGroupItem>
                   <ToggleGroupItem value="pvm">PVM · 7 kk</ToggleGroupItem>
                 </ToggleGroup>
                 <FieldDescription className="text-xs">
-                  Wysokość składki za wstęp jest naliczana według typu postaci, którą wchodzisz na rajd.
+                  Dotyczy tylko V3. Jeśli ta postać nie chodzi na V3, zostaw puste (kliknij zaznaczone, żeby odznaczyć).
                 </FieldDescription>
               </Field>
             </FieldGroup>
@@ -331,7 +353,7 @@ export function CharacterManagement({
           <DialogHeader>
             <DialogTitle>Edytuj postać</DialogTitle>
             <DialogDescription className="text-xs">
-              Zmień nick w grze lub typ postaci.
+              Zmień nick w grze, opis lub składkę na V3.
             </DialogDescription>
           </DialogHeader>
 
@@ -349,18 +371,29 @@ export function CharacterManagement({
               </Field>
 
               <Field>
-                <FieldLabel>Typ postaci</FieldLabel>
+                <FieldLabel htmlFor="edit-character-description">Krótki opis (opcjonalnie)</FieldLabel>
+                <Input
+                  id="edit-character-description"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="np. mój dropek do m2"
+                  maxLength={60}
+                />
+              </Field>
+
+              <Field>
+                <FieldLabel>Składka na V3 (opcjonalnie)</FieldLabel>
                 <ToggleGroup
-                  value={[editPlaystyle]}
-                  onValueChange={(val) => {
-                    const next = val[0] as "pvp" | "pvm" | undefined
-                    if (next) setEditPlaystyle(next)
-                  }}
+                  value={editPlaystyle ? [editPlaystyle] : []}
+                  onValueChange={(val) => setEditPlaystyle((val[0] as Playstyle | undefined) ?? null)}
                   spacing={2}
                 >
                   <ToggleGroupItem value="pvp">PVP · 3 kk</ToggleGroupItem>
                   <ToggleGroupItem value="pvm">PVM · 7 kk</ToggleGroupItem>
                 </ToggleGroup>
+                <FieldDescription className="text-xs">
+                  Dotyczy tylko V3. Jeśli ta postać nie chodzi na V3, zostaw puste (kliknij zaznaczone, żeby odznaczyć).
+                </FieldDescription>
               </Field>
             </FieldGroup>
 

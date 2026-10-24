@@ -28,10 +28,6 @@ export function ProfileForm({
       className="flex max-w-md flex-col gap-6"
       onSubmit={(event) => {
         event.preventDefault()
-        if (!style) {
-          toast.error("Wybierz PVP albo PVM.")
-          return
-        }
         startTransition(async () => {
           const result = await updateProfile({ gameNick: nick, playstyle: style })
           if (!result.ok) {
@@ -56,20 +52,18 @@ export function ProfileForm({
           <FieldDescription>Taki nick zobaczą inni na siatce.</FieldDescription>
         </Field>
         <Field>
-          <FieldLabel>Typ postaci</FieldLabel>
+          <FieldLabel>Składka na V3 (opcjonalnie)</FieldLabel>
           <ToggleGroup
             value={style ? [style] : []}
-            onValueChange={(value) => {
-              const next = value[0] as Playstyle | undefined
-              if (next) setStyle(next)
-            }}
+            onValueChange={(value) => setStyle((value[0] as Playstyle | undefined) ?? null)}
             spacing={2}
           >
             <ToggleGroupItem value="pvp">PVP · 3 kk</ToggleGroupItem>
             <ToggleGroupItem value="pvm">PVM · 7 kk</ToggleGroupItem>
           </ToggleGroup>
           <FieldDescription>
-            Składka za wejście zależy od typu. Zmiana nie przepisuje starych zapisów.
+            Dotyczy tylko V3. Jeśli nie chodzisz na V3, zostaw puste (kliknij zaznaczone, żeby odznaczyć). Zmiana nie
+            przepisuje starych zapisów.
           </FieldDescription>
         </Field>
       </FieldGroup>

@@ -4,15 +4,31 @@ import { revalidatePath } from "next/cache"
 import { and, desc, eq, ilike, isNull, ne, or } from "drizzle-orm"
 import { getDb } from "@/lib/db"
 import { guildEventSignups, userCharacters, users, type UserCharacter } from "@/lib/db/schema"
+import { isPlaystyle, type Playstyle } from "@/lib/constants"
 import { requireUser } from "@/lib/session"
 import { fail, ok, type ActionResult } from "@/lib/actions/result"
 
 export type CharacterItem = {
   id: string
   name: string
-  playstyle: "pvp" | "pvm"
+  /** null: the character does not go to V3. */
+  playstyle: Playstyle | null
   isMain: boolean
+  description: string
   createdAt: string
+}
+
+const MAX_DESCRIPTION = 60
+
+function toItem(r: UserCharacter): CharacterItem {
+  return {
+    id: r.id,
+    name: r.name,
+    playstyle: isPlaystyle(r.playstyle ?? "") ? (r.playstyle as Playstyle) : null,
+    isMain: r.isMain,
+    description: r.description,
+    createdAt: new Date(r.createdAt).toISOString(),
+  }
 }
 
 /**
@@ -30,13 +46,7 @@ export async function listUserCharacters(userId: string): Promise<CharacterItem[
       .orderBy(desc(userCharacters.isMain), userCharacters.createdAt)
 
     if (rows.length > 0) {
-      return rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        playstyle: (r.playstyle as "pvp" | "pvm") || "pvm",
-        isMain: r.isMain,
-        createdAt: new Date(r.createdAt).toISOString(),
-      }))
+      return rows.map(toItem)
     }
 
     // Auto-seed main character from users table if empty
@@ -47,7 +57,7 @@ export async function listUserCharacters(userId: string): Promise<CharacterItem[
 
     if (!user) return []
 
-    const playstyle = (user.playstyle as "pvp" | "pvm") || "pvm"
+    const playstyle = isPlaystyle(user.playstyle ?? "") ? (user.playstyle as Playstyle) : null
 
     try {
       await db
@@ -73,13 +83,7 @@ export async function listUserCharacters(userId: string): Promise<CharacterItem[
       .orderBy(desc(userCharacters.isMain), userCharacters.createdAt)
 
     if (seededRows.length > 0) {
-      return seededRows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        playstyle: (r.playstyle as "pvp" | "pvm") || "pvm",
-        isMain: r.isMain,
-        createdAt: new Date(r.createdAt).toISOString(),
-      }))
+      return seededRows.map(toItem)
     }
 
     // If still empty (e.g. name collided with another user's character), insert with a unique suffix
@@ -104,13 +108,7 @@ export async function listUserCharacters(userId: string): Promise<CharacterItem[
         .orderBy(desc(userCharacters.isMain), userCharacters.createdAt)
 
       if (retryRows.length > 0) {
-        return retryRows.map((r) => ({
-          id: r.id,
-          name: r.name,
-          playstyle: (r.playstyle as "pvp" | "pvm") || "pvm",
-          isMain: r.isMain,
-          createdAt: new Date(r.createdAt).toISOString(),
-        }))
+        return retryRows.map(toItem)
       }
     } catch (fallbackErr) {
       console.warn("[characters] Fallback character insert warning:", fallbackErr)
@@ -128,16 +126,19 @@ export async function listUserCharacters(userId: string): Promise<CharacterItem[
  */
 export async function addCharacter(input: {
   name: string
-  playstyle: "pvp" | "pvm"
+  playstyle: Playstyle | null
+  description?: string
 }): Promise<ActionResult<{ character: CharacterItem }>> {
   const user = await requireUser()
   const name = input.name.trim()
+  const description = (input.description ?? "").trim()
+  if (description.length > MAX_DESCRIPTION) return fail(`Opis może mieć najwyżej ${MAX_DESCRIPTION} znaków.`)
 
   if (!name || name.length < 2 || name.length > 24) {
     return fail("Nick postaci musi mieć od 2 do 24 znaków.")
   }
 
-  if (input.playstyle !== "pvp" && input.playstyle !== "pvm") {
+  if (input.playstyle !== null && !isPlaystyle(input.playstyle)) {
     return fail("Wybierz poprawny typ postaci (PVP lub PVM).")
   }
 
@@ -170,6 +171,7 @@ export async function addCharacter(input: {
     name,
     playstyle: input.playstyle,
     isMain,
+    description,
     createdAt: now,
   })
 
@@ -194,6 +196,7 @@ export async function addCharacter(input: {
       name,
       playstyle: input.playstyle,
       isMain,
+      description,
       createdAt: now.toISOString(),
     },
   })
@@ -205,16 +208,19 @@ export async function addCharacter(input: {
 export async function updateCharacter(input: {
   characterId: string
   name: string
-  playstyle: "pvp" | "pvm"
+  playstyle: Playstyle | null
+  description: string
 }): Promise<ActionResult> {
   const user = await requireUser()
   const name = input.name.trim()
+  const description = input.description.trim()
+  if (description.length > MAX_DESCRIPTION) return fail(`Opis może mieć najwyżej ${MAX_DESCRIPTION} znaków.`)
 
   if (!name || name.length < 2 || name.length > 24) {
     return fail("Nick postaci musi mieć od 2 do 24 znaków.")
   }
 
-  if (input.playstyle !== "pvp" && input.playstyle !== "pvm") {
+  if (input.playstyle !== null && !isPlaystyle(input.playstyle)) {
     return fail("Wybierz poprawny typ postaci (PVP lub PVM).")
   }
 
@@ -244,7 +250,7 @@ export async function updateCharacter(input: {
 
   await db
     .update(userCharacters)
-    .set({ name, playstyle: input.playstyle })
+    .set({ name, playstyle: input.playstyle, description })
     .where(eq(userCharacters.id, input.characterId))
 
   // If this character is main, sync users table
@@ -255,13 +261,13 @@ export async function updateCharacter(input: {
       .where(eq(users.id, user.id))
   }
 
+  // Without a V3 type the signup keeps its role; only the name follows.
+  const role = input.playstyle ? { role: input.playstyle === "pvp" ? "PvP" : "PvM" } : {}
+
   // Update signups for this character
   await db
     .update(guildEventSignups)
-    .set({
-      characterName: name,
-      role: input.playstyle === "pvp" ? "PvP" : "PvM",
-    })
+    .set({ characterName: name, ...role })
     .where(
       and(
         eq(guildEventSignups.characterId, input.characterId),
@@ -277,10 +283,7 @@ export async function updateCharacter(input: {
   if (char.isMain) {
     await db
       .update(guildEventSignups)
-      .set({
-        characterName: name,
-        role: input.playstyle === "pvp" ? "PvP" : "PvM",
-      })
+      .set({ characterName: name, ...role })
       .where(
         and(
           eq(guildEventSignups.userId, user.id),

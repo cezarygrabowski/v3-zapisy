@@ -146,7 +146,10 @@ export async function getFeeLedger(): Promise<Map<string, UserFeeState>> {
         ? row.userPlaystyle
         : row.characterPlaystyle === "pvp" || row.characterPlaystyle === "pvm"
           ? row.characterPlaystyle
-          : "pvm"
+          : // Type cleared ("bez V3") after signing up: the signup's own role still says what was paid for.
+            row.role?.toLowerCase() === "pvp"
+            ? "pvp"
+            : "pvm"
     ) as Playstyle
 
     const baseFeeKk = playstyle === "pvp" ? PVP_FEE_KK : PVM_FEE_KK

@@ -316,3 +316,43 @@ describe("Fee calculation recalculates for previous week on character playstyle 
     assert.equal(state.currentWeekRemainingKk, PVP_FEE_KK, "currentWeekRemainingKk should NOT count dungeon event")
   })
 })
+
+describe("Fee when the V3 type is cleared after signing up", () => {
+  const ts = Date.now()
+  const userId = `test-user-nov3-${ts}`
+  const charId = `test-char-nov3-${ts}`
+
+  test.after(async () => {
+    const db = await getDb()
+    await db.delete(users).where(eq(users.id, userId))
+  })
+
+  test("falls back to the signup's PvP role instead of PVM", async () => {
+    const db = await getDb()
+    const eventId = `test-event-nov3-${ts}`
+    await db.insert(users).values({ id: userId, discordName: userId, gameNick: userId, playstyle: null, isVerified: true })
+    await db.insert(userCharacters).values({ id: charId, userId, name: `NoV3_${ts}`, playstyle: null, isMain: true })
+    await db.insert(guildEvents).values({
+      id: eventId,
+      title: "V3",
+      type: "v3",
+      date: addDays(weekStartInWarsaw(new Date()), -7),
+      startTime: "20:00",
+      endTime: "21:00",
+      createdBy: userId,
+      status: "finished",
+    })
+    await db.insert(guildEventSignups).values({
+      id: `signup-nov3-${ts}`,
+      eventId,
+      userId,
+      characterId: charId,
+      characterName: `NoV3_${ts}`,
+      spot: "R1",
+      role: "PvP",
+      attended: true,
+    })
+    assert.equal((await getFeeLedger()).get(userId)?.overdueKk, PVP_FEE_KK)
+    await db.delete(guildEvents).where(eq(guildEvents.id, eventId))
+  })
+})

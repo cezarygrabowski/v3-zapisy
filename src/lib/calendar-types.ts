@@ -354,7 +354,7 @@ export type EventDetails = {
   currentUserCharacters?: {
     id: string
     name: string
-    playstyle: "pvp" | "pvm"
+    playstyle: "pvp" | "pvm" | null
     isMain: boolean
   }[]
   signupAdvanceDays?: number

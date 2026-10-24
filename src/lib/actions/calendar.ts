@@ -207,10 +207,15 @@ export async function signUpForGuildEvent(input: {
     selectedChar = {
       id: targetUserId,
       name: targetUser?.gameNick || "Gracz",
-      playstyle: (targetUser?.playstyle as "pvp" | "pvm") || "pvm",
+      playstyle: targetUser?.playstyle === "pvp" || targetUser?.playstyle === "pvm" ? targetUser.playstyle : null,
       isMain: true,
+      description: "",
       createdAt: new Date().toISOString(),
     }
+  }
+
+  if (event.type === "v3" && !selectedChar.playstyle) {
+    return fail(`Postać „${selectedChar.name}” nie ma ustawionej składki V3 (PVP/PVM). Ustaw ją w zakładce Konto.`)
   }
 
   const today = todayInWarsaw(new Date())
@@ -1009,7 +1014,7 @@ export async function getGuildEventModalDetails(eventId: string) {
           }
         }
 
-        let currentUserCharacters: { id: string; name: string; playstyle: "pvp" | "pvm"; isMain: boolean }[] = []
+        let currentUserCharacters: { id: string; name: string; playstyle: "pvp" | "pvm" | null; isMain: boolean }[] = []
         try {
           const { listUserCharacters } = await import("@/lib/actions/characters")
           currentUserCharacters = await listUserCharacters(user.id)
@@ -1031,7 +1036,7 @@ export async function getGuildEventModalDetails(eventId: string) {
     }
 
     // For non-V3 events, also attach auditLogs and characters if user logged in
-    let currentUserCharacters: { id: string; name: string; playstyle: "pvp" | "pvm"; isMain: boolean }[] = []
+    let currentUserCharacters: { id: string; name: string; playstyle: "pvp" | "pvm" | null; isMain: boolean }[] = []
     if (user) {
       try {
         const { listUserCharacters } = await import("@/lib/actions/characters")

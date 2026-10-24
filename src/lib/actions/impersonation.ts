@@ -16,6 +16,7 @@ export async function startImpersonation(targetUserId: string): Promise<ActionRe
   if (!target) {
     return fail("Nie znaleziono wybranego gracza.")
   }
+  if (target.isSuperAdmin && !leader.isSuperAdmin) return fail("Nie możesz wcielić się w super admina.")
 
   const cookieStore = await cookies()
   cookieStore.set(IMPERSONATION_COOKIE, targetUserId, {

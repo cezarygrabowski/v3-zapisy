@@ -7,7 +7,7 @@ type AppDb = {
   execute: (query: ReturnType<typeof sql>) => Promise<unknown>
 } & ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>
 
-const SCHEMA_VERSION = 20
+const SCHEMA_VERSION = 26
 
 const globalForDb = globalThis as unknown as {
   dbPromise?: Promise<AppDb>
@@ -325,6 +325,47 @@ const SCHEMA_SQL = [
       created_at timestamptz NOT NULL DEFAULT now()
     )`,
   `CREATE INDEX IF NOT EXISTS guild_event_images_event_idx ON guild_event_images(event_id)`,
+  `CREATE TABLE IF NOT EXISTS character_reports (
+      id text PRIMARY KEY,
+      character_id text NOT NULL REFERENCES user_characters(id) ON DELETE CASCADE,
+      created_by text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      level integer,
+      horse_level integer,
+      character_class text NOT NULL DEFAULT '',
+      biolog text NOT NULL DEFAULT '',
+      skills text NOT NULL DEFAULT '',
+      equipment text NOT NULL DEFAULT '',
+      notes text NOT NULL DEFAULT '',
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `CREATE INDEX IF NOT EXISTS character_reports_character_idx ON character_reports(character_id, created_at)`,
+  `CREATE TABLE IF NOT EXISTS character_report_images (
+      id text PRIMARY KEY,
+      report_id text NOT NULL REFERENCES character_reports(id) ON DELETE CASCADE,
+      kind text NOT NULL DEFAULT 'inne',
+      mime_type text NOT NULL,
+      data bytea NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `CREATE INDEX IF NOT EXISTS character_report_images_report_idx ON character_report_images(report_id)`,
+  `ALTER TABLE character_report_images ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'inne'`,
+  `ALTER TABLE character_reports ADD COLUMN IF NOT EXISTS horse_level integer`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_super_admin boolean NOT NULL DEFAULT false`,
+  `CREATE TABLE IF NOT EXISTS guilds (
+      id text PRIMARY KEY,
+      name text NOT NULL UNIQUE,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  `ALTER TABLE user_characters ADD COLUMN IF NOT EXISTS guild_id text REFERENCES guilds(id) ON DELETE SET NULL`,
+  `CREATE TABLE IF NOT EXISTS guild_admins (
+      user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      guild_id text NOT NULL REFERENCES guilds(id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, guild_id)
+    )`,
+  `ALTER TABLE user_characters ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT ''`,
+  `ALTER TABLE user_characters ALTER COLUMN playstyle DROP NOT NULL`,
+  // Local dev login account only; dev: ids never exist in production, where the flag is set by hand.
+  `UPDATE users SET is_super_admin = true WHERE discord_id = 'dev:cezary'`,
 ]
 
 async function ensureSchema(db: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }) {

@@ -10,7 +10,7 @@ import { Spinner } from "@/components/ui/spinner"
 const MAX_SIDE = 2560
 
 /** Re-encodes a screenshot as WebP (JPEG where the browser can't encode WebP) so it fits the upload limit. */
-async function compress(file: File): Promise<Blob> {
+export async function compress(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file)
   const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
   const canvas = document.createElement("canvas")

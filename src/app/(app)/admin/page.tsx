@@ -1,6 +1,8 @@
 import { AdminNav } from "@/components/admin-nav"
 import { AdminUsers } from "@/components/admin-users"
 import { AdminYellowCards } from "@/components/admin-yellow-cards"
+import { getDb } from "@/lib/db"
+import { guildAdmins, guilds } from "@/lib/db/schema"
 import { listUsers } from "@/lib/queries"
 import { requireLeader } from "@/lib/session"
 import { listAllPenalties } from "@/lib/actions/penalties"
@@ -10,9 +12,12 @@ export const dynamic = "force-dynamic"
 export default async function AdminPage() {
   const leader = await requireLeader()
 
-  const [users, penalties] = await Promise.all([
+  const db = await getDb()
+  const [users, penalties, guildRows, adminRows] = await Promise.all([
     listUsers(),
     listAllPenalties(),
+    db.select({ id: guilds.id, name: guilds.name }).from(guilds).orderBy(guilds.name),
+    db.select().from(guildAdmins),
   ])
 
   return (
@@ -24,7 +29,7 @@ export default async function AdminPage() {
         </p>
       </div>
 
-      <AdminNav />
+      <AdminNav isSuperAdmin={leader.isSuperAdmin} />
 
       <AdminYellowCards
         penalties={penalties}
@@ -33,6 +38,8 @@ export default async function AdminPage() {
 
       <AdminUsers
         currentUserId={leader.id}
+        isSuperAdmin={leader.isSuperAdmin}
+        guilds={guildRows}
         users={users.map((user) => ({
           id: user.id,
           gameNick: user.gameNick,
@@ -41,6 +48,8 @@ export default async function AdminPage() {
           hasDiscord: Boolean(user.discordId),
           playstyle: user.playstyle,
           isLeader: user.isLeader,
+          isSuperAdmin: user.isSuperAdmin,
+          adminGuildIds: adminRows.filter((a) => a.userId === user.id).map((a) => a.guildId),
           isVerified: user.isVerified ?? false,
           roles: user.roles || "[]",
         }))}

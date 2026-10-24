@@ -11,15 +11,16 @@ import { requireUser } from "@/lib/session"
 
 export async function updateProfile(input: {
   gameNick: string
-  playstyle: string
+  playstyle: string | null
 }): Promise<ActionResult> {
   const user = await requireUser()
   const gameNick = input.gameNick.trim()
   if (gameNick.length < 2 || gameNick.length > 24) {
     return fail("Nick w grze musi mieć 2–24 znaki.")
   }
-  if (!isPlaystyle(input.playstyle)) {
-    return fail("Wybierz PVP albo PVM.")
+  // null: the player does not go to V3.
+  if (input.playstyle !== null && !isPlaystyle(input.playstyle)) {
+    return fail("Wybierz PVP, PVM albo zostaw puste.")
   }
 
   const db = await getDb()
@@ -32,16 +33,14 @@ export async function updateProfile(input: {
     .update(userCharacters)
     .set({
       name: gameNick,
-      playstyle: input.playstyle as "pvp" | "pvm",
+      playstyle: input.playstyle,
     })
     .where(and(eq(userCharacters.userId, user.id), eq(userCharacters.isMain, true)))
 
   await db
     .update(guildEventSignups)
-    .set({
-      characterName: gameNick,
-      role: input.playstyle === "pvp" ? "PvP" : "PvM",
-    })
+    // Without a V3 type the signups keep their role; only the name follows.
+    .set({ characterName: gameNick, ...(input.playstyle && { role: input.playstyle === "pvp" ? "PvP" : "PvM" }) })
     .where(
       and(
         eq(guildEventSignups.userId, user.id),

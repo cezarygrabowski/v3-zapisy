@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, eq, gte, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm"
+import { and, eq, gte, ilike, inArray, isNull, or } from "drizzle-orm"
 import { isPlaystyle } from "@/lib/constants"
 import { getDb, isUniqueViolation } from "@/lib/db"
 import { guildEvents, guildEventSignups, guildSettings, konwojGroupMembers, userCharacters, users } from "@/lib/db/schema"
@@ -17,30 +17,6 @@ import {
   SETTING_KEY_PENALTY_RULES,
   type PenaltyRulesConfig,
 } from "@/lib/settings"
-
-export async function setLeader(userId: string, isLeader: boolean): Promise<ActionResult> {
-  const actor = await requireLeader()
-  const db = await getDb()
-  const target = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-  })
-  if (!target) return fail("Nie znaleziono gracza.")
-
-  if (target.id === actor.id && !isLeader) {
-    const [{ count }] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(users)
-      .where(and(eq(users.isLeader, true), ne(users.id, actor.id)))
-    if (Number(count) === 0) {
-      return fail("Nie można zdjąć ostatniego admina.")
-    }
-  }
-
-  await db.update(users).set({ isLeader }).where(eq(users.id, userId))
-  revalidatePath("/", "layout")
-  revalidatePath("/admin")
-  return ok()
-}
 
 export async function setPlaystyle(userId: string, playstyle: string): Promise<ActionResult> {
   await requireLeader()
@@ -81,7 +57,6 @@ export async function createUser(input: {
   login: string
   password: string
   playstyle: string
-  isLeader: boolean
 }): Promise<ActionResult> {
   await requireLeader()
   const gameNick = input.gameNick.trim()
@@ -103,7 +78,7 @@ export async function createUser(input: {
       login: input.login,
       password: input.password,
       playstyle,
-      isLeader: input.isLeader,
+      isLeader: false, // admin is granted afterwards by the super admin, together with a guild
     })
   } catch (error) {
     if (error instanceof Error && (error.message === "LOGIN" || error.message === "PASSWORD")) {
@@ -122,13 +97,14 @@ export async function setUserPassword(input: {
   login?: string
   password: string
 }): Promise<ActionResult> {
-  await requireLeader()
+  const actor = await requireLeader()
   const password = parsePassword(input.password)
   if (!password) return fail("Hasło musi mieć 8–72 znaki.")
 
   const db = await getDb()
   const target = await findUserById(input.userId)
   if (!target) return fail("Nie znaleziono gracza.")
+  if (target.isSuperAdmin && !actor.isSuperAdmin) return fail("Hasło super admina zmienia tylko on sam.")
 
   const login = input.login
     ? parseLogin(input.login)
@@ -391,6 +367,7 @@ export async function deleteUser(userId: string): Promise<ActionResult> {
   const db = await getDb()
   const target = await db.query.users.findFirst({ where: and(eq(users.id, userId), isNull(users.deletedAt)) })
   if (!target) return fail("Nie znaleziono użytkownika.")
+  if (target.isSuperAdmin) return fail("Nie można usunąć konta super admina.")
 
   await db.transaction(async (tx) => {
     await tx

@@ -32,7 +32,8 @@ export const getImpersonationState = cache(async (): Promise<ImpersonationState>
     }
 
     const impersonatedUser = await findUserById(impersonatedId)
-    if (!impersonatedUser) {
+    // An admin must not borrow the super admin's powers.
+    if (!impersonatedUser || (impersonatedUser.isSuperAdmin && !realUser.isSuperAdmin)) {
       return { isImpersonating: false, realUser, impersonatedUser: null }
     }
 
@@ -68,6 +69,12 @@ export async function requireUser(): Promise<User> {
 export async function requireLeader(): Promise<User> {
   const user = await requireUser()
   if (!user.isLeader) redirect("/panel")
+  return user
+}
+
+export async function requireSuperAdmin(): Promise<User> {
+  const user = await requireUser()
+  if (!user.isSuperAdmin) redirect("/panel")
   return user
 }
 

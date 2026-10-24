@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/alerty", label: "Alerty" },
   { href: "/kalendarz", label: "📅 Kalendarz" },
   { href: "/konwoj", label: "🐍 Konwój" },
+  { href: "/postep", label: "📈 Postęp" },
   { href: "/skladki", label: "Składki" },
   { href: "/statystyki", label: "Statystyki" },
   { href: "/regulamin", label: "Regulamin" },

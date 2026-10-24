@@ -47,7 +47,7 @@ export default async function AdminKonfiguracjaPage() {
         </p>
       </div>
 
-      <AdminNav />
+      <AdminNav isSuperAdmin={leader.isSuperAdmin} />
 
       <AdminDiscordSettings initialConfig={discordConfig} />
 

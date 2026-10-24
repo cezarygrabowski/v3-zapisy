@@ -24,6 +24,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   playstyle: text("playstyle"),
   isLeader: boolean("is_leader").notNull().default(false),
+  // Sees every character on /postep and is the only one who can grant or revoke admin.
+  isSuperAdmin: boolean("is_super_admin").notNull().default(false),
   isVerified: boolean("is_verified").notNull().default(false),
   roles: text("roles").notNull().default("[]"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -37,10 +39,35 @@ export const userCharacters = pgTable("user_characters", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull().unique(),
-  playstyle: text("playstyle").notNull().default("pvm"),
+  // V3 fee type; null for a character that does not go to V3.
+  playstyle: text("playstyle").default("pvm"),
   isMain: boolean("is_main").notNull().default(false),
+  // Short note from the owner, e.g. "mój dropek do m2".
+  description: text("description").notNull().default(""),
+  guildId: text("guild_id").references(() => guilds.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
+
+// Guilds scope only the /postep character list; everything else stays shared.
+export const guilds = pgTable("guilds", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+})
+
+// Which guilds an admin sees on /postep.
+export const guildAdmins = pgTable(
+  "guild_admins",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.guildId] })]
+)
 
 export const personalTimers = pgTable("personal_timers", {
   id: text("id").primaryKey(),
@@ -698,4 +725,44 @@ export const guildEventImages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("guild_event_images_event_idx").on(t.eventId)]
+)
+
+/** A snapshot of a character's progress; each one is compared with an earlier one on /postep. */
+export const characterReports = pgTable(
+  "character_reports",
+  {
+    id: text("id").primaryKey(),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => userCharacters.id, { onDelete: "cascade" }),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    level: integer("level"),
+    horseLevel: integer("horse_level"),
+    characterClass: text("character_class").notNull().default(""),
+    biolog: text("biolog").notNull().default(""),
+    // One "Name: value" per line, so each skill / EQ slot can be compared between reports.
+    skills: text("skills").notNull().default(""),
+    equipment: text("equipment").notNull().default(""),
+    notes: text("notes").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("character_reports_character_idx").on(t.characterId, t.createdAt)]
+)
+
+export const characterReportImages = pgTable(
+  "character_report_images",
+  {
+    id: text("id").primaryKey(),
+    reportId: text("report_id")
+      .notNull()
+      .references(() => characterReports.id, { onDelete: "cascade" }),
+    // Which war EQ section the screenshot belongs to ("absy", "silny", "hp") or "inne".
+    kind: text("kind").notNull().default("inne"),
+    mimeType: text("mime_type").notNull(),
+    data: bytea("data").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("character_report_images_report_idx").on(t.reportId)]
 )

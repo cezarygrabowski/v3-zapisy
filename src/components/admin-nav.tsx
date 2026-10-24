@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
-export function AdminNav() {
+export function AdminNav({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const pathname = usePathname()
 
   const tabs = [
@@ -18,6 +18,7 @@ export function AdminNav() {
       label: "⚙️ Konfiguracja",
       exact: false,
     },
+    ...(isSuperAdmin ? [{ href: "/admin/gildie", label: "🏰 Gildie", exact: false }] : []),
     {
       href: "/regulamin",
       label: "📜 Regulamin",
