@@ -4,15 +4,16 @@ import { useState, useTransition, type FormEvent } from "react"
 import { Bell, Check, Clock, Pencil, Plus, Trash2, Volume2, VolumeX } from "lucide-react"
 import { toast } from "sonner"
 import { useAlerts } from "@/components/alerts-provider"
-import { saveAlertTimer, completeAlertTimer, deleteAlertTimer } from "@/lib/actions/alerts"
+import { saveAlertTimer, completeAlertTimer, deleteAlertTimer, setAlertTimerRemaining } from "@/lib/actions/alerts"
 import type { ActionResult } from "@/lib/actions/result"
-import { formatCountdown, type AlertTimer } from "@/lib/alert-timer-types"
+import { formatCountdown, parseCountdown, type AlertTimer } from "@/lib/alert-timer-types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -28,6 +29,8 @@ export function PersonalAlerts({ characters }: { characters: { id: string; name:
   const [minutes, setMinutes] = useState("0")
   const [startNow, setStartNow] = useState(false)
   const [filter, setFilter] = useState("all")
+  const [timeEdit, setTimeEdit] = useState<{ timer: AlertTimer; value: string } | null>(null)
+  const [timeConfirm, setTimeConfirm] = useState<{ timer: AlertTimer; seconds: number } | null>(null)
   const sorted = [...timers].sort((a, b) => a.readyAt - b.readyAt || a.name.localeCompare(b.name, "pl"))
   const ready = sorted.filter((timer) => timer.readyAt <= now)
   const visible = sorted.filter((timer) => filter === "all" || (filter === "general" ? !timer.characterId : timer.characterId === filter))
@@ -68,6 +71,17 @@ export function PersonalAlerts({ characters }: { characters: { id: string; name:
       name, characterId: characterId === "general" ? null : characterId,
       intervalMinutes: h * 60 + m, startNow,
     }), () => setEditor(null))
+  }
+
+  function submitTime() {
+    if (!timeEdit) return
+    const seconds = parseCountdown(timeEdit.value)
+    if (seconds === null || seconds > 525600 * 60) {
+      toast.error("Wpisz czas jako GG:MM lub GG:MM:SS, np. 05:30.")
+      return
+    }
+    setTimeConfirm({ timer: timeEdit.timer, seconds })
+    setTimeEdit(null)
   }
 
   return (
@@ -126,7 +140,33 @@ export function PersonalAlerts({ characters }: { characters: { id: string; name:
                 <CardContent className="flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-2">
                     <Badge variant={isReady ? "default" : "secondary"}>{isReady ? <Bell data-icon="inline-start" /> : <Clock data-icon="inline-start" />}{isReady ? "Alerty" : "Odliczanie"}</Badge>
-                    <span className="font-mono text-2xl tabular-nums" aria-label={isReady ? "Timer gotowy" : "Pozostały czas"}>{isReady ? "Gotowe" : formatCountdown(timer.readyAt, now)}</span>
+                    {timeEdit?.timer.id === timer.id ? (
+                      <form onSubmit={(event) => { event.preventDefault(); submitTime() }}>
+                        <Input
+                          autoFocus
+                          aria-label={`Nowy pozostały czas dla ${timer.name}`}
+                          className="h-9 w-36 text-right font-mono text-lg tabular-nums"
+                          value={timeEdit.value}
+                          placeholder="GG:MM:SS"
+                          enterKeyHint="done"
+                          onFocus={(event) => event.currentTarget.select()}
+                          onChange={(event) => setTimeEdit({ timer, value: event.target.value })}
+                          onKeyDown={(event) => { if (event.key === "Escape") setTimeEdit(null) }}
+                          onBlur={() => setTimeEdit(null)}
+                        />
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={pending}
+                        className="cursor-text rounded-md px-1 font-mono text-2xl tabular-nums hover:bg-muted"
+                        title="Kliknij, aby zmienić pozostały czas"
+                        aria-label={`${isReady ? "Timer gotowy" : `Pozostały czas ${formatCountdown(timer.readyAt, now)}`} — kliknij, aby zmienić`}
+                        onClick={() => setTimeEdit({ timer, value: formatCountdown(timer.readyAt, now) })}
+                      >
+                        {isReady ? "Gotowe" : formatCountdown(timer.readyAt, now)}
+                      </button>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {isReady ? "Termin: " : "Następna kolejka: "}
@@ -198,6 +238,26 @@ export function PersonalAlerts({ characters }: { characters: { id: string; name:
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={timeConfirm !== null} onOpenChange={(open) => { if (!open) setTimeConfirm(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Na pewno?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {timeConfirm ? <>Ustawić „{timeConfirm.timer.name}”{timeConfirm.timer.characterName ? ` (${timeConfirm.timer.characterName})` : ""} na <strong className="font-mono">{formatCountdown(timeConfirm.seconds * 1000, 0)}</strong> do końca?</> : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Anuluj</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (!timeConfirm) return
+              const { timer, seconds } = timeConfirm
+              setTimeConfirm(null)
+              run(() => setAlertTimerRemaining(timer.id, seconds))
+            }}>Zmień czas</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={deleting !== null} onOpenChange={(open) => { if (!open && !pending) setDeleting(null) }}>
         <DialogContent>

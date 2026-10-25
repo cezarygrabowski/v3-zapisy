@@ -74,6 +74,22 @@ export async function completePersonalTimer(userId: string, timerId: string) {
   return updated.length ? ok("Rozpoczęto kolejne odliczanie.") : fail("Nie znaleziono timera.")
 }
 
+export async function setPersonalTimerRemaining(userId: string, timerId: string, remainingSeconds: number) {
+  if (typeof timerId !== "string" || !timerId) return fail("Nieprawidłowy timer.")
+  if (!Number.isInteger(remainingSeconds) || remainingSeconds < 0 || remainingSeconds > 525600 * 60) {
+    return fail("Podaj czas od 0 do 365 dni.")
+  }
+  const db = await getDb()
+  const [timer] = await db.select({ intervalMinutes: personalTimers.intervalMinutes }).from(personalTimers)
+    .where(and(eq(personalTimers.id, timerId), eq(personalTimers.userId, userId)))
+  if (!timer) return fail("Nie znaleziono timera.")
+  // readyAt = lastCompletedAt + interval, so shift lastCompletedAt to land on the requested remaining time.
+  await db.update(personalTimers)
+    .set({ lastCompletedAt: new Date(Date.now() + remainingSeconds * 1000 - timer.intervalMinutes * 60000) })
+    .where(and(eq(personalTimers.id, timerId), eq(personalTimers.userId, userId)))
+  return ok("Zmieniono pozostały czas.")
+}
+
 export async function removePersonalTimer(userId: string, timerId: string) {
   if (typeof timerId !== "string" || !timerId) return fail("Nieprawidłowy timer.")
   const db = await getDb()

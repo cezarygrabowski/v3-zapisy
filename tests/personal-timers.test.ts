@@ -3,8 +3,8 @@ import assert from "node:assert/strict"
 import { eq } from "drizzle-orm"
 import { getDb } from "../src/lib/db/index"
 import { users, userCharacters, personalTimers } from "../src/lib/db/schema"
-import { listPersonalTimers, savePersonalTimer, completePersonalTimer, removePersonalTimer } from "../src/lib/personal-timers"
-import { formatCountdown } from "../src/lib/alert-timer-types"
+import { listPersonalTimers, savePersonalTimer, completePersonalTimer, removePersonalTimer, setPersonalTimerRemaining } from "../src/lib/personal-timers"
+import { formatCountdown, parseCountdown } from "../src/lib/alert-timer-types"
 
 test("personal timers: validation, ownership, repeat, editing and character deletion", async () => {
   assert.equal(process.env.DATABASE_URL || "", "", "Tests must not run against a remote database")
@@ -37,6 +37,14 @@ test("personal timers: validation, ownership, repeat, editing and character dele
     ;[timer] = await listPersonalTimers(owner)
     assert.ok(timer.lastCompletedAt)
     assert.equal(timer.readyAt, Date.parse(timer.lastCompletedAt!) + 3600000)
+    for (const seconds of [-1, 1.5, NaN, 525600 * 60 + 1]) {
+      assert.equal((await setPersonalTimerRemaining(owner, timer.id, seconds)).ok, false)
+    }
+    assert.equal((await setPersonalTimerRemaining(other, timer.id, 60)).ok, false)
+    const before = Date.now()
+    assert.equal((await setPersonalTimerRemaining(owner, timer.id, 5400)).ok, true)
+    ;[timer] = await listPersonalTimers(owner)
+    assert.ok(timer.readyAt >= before + 5400000 && timer.readyAt <= Date.now() + 5400000)
     const lastCompletedAt = timer.lastCompletedAt
     assert.equal((await savePersonalTimer(owner, { ...input, id: timer.id, name: "Księga", intervalMinutes: 30 })).ok, true)
     ;[timer] = await listPersonalTimers(owner)
@@ -60,4 +68,8 @@ test("personal timers: validation, ownership, repeat, editing and character dele
   assert.equal(formatCountdown(1, 0), "00:00:01")
   assert.equal(formatCountdown(0, 1), "00:00:00")
   assert.equal(formatCountdown(90061000, 0), "1 d 01:01:01")
+  assert.equal(parseCountdown("1 d 01:01:01"), 90061)
+  assert.equal(parseCountdown(" 05:30 "), 19800)
+  assert.equal(parseCountdown("30:00:05"), 108005)
+  for (const bad of ["", "5", "5:7", "01:60", "01:00:60", "abc"]) assert.equal(parseCountdown(bad), null)
 })
