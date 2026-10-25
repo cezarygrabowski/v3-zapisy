@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNull, max, or } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, isNull, max, or, sql } from "drizzle-orm"
 import { getDb } from "@/lib/db"
 import {
   characterReportImages,
@@ -65,7 +65,8 @@ export async function listProgressCharacters(user: User) {
       .leftJoin(characterReports, eq(characterReports.characterId, userCharacters.id))
       .where(and(isNull(users.deletedAt), await characterScope(user)))
       .groupBy(userCharacters.id, users.gameNick, guilds.name)
-      .orderBy(asc(userCharacters.name)),
+      // Freshest reports on top; characters without one go last.
+      .orderBy(sql`max(${characterReports.createdAt}) desc nulls last`, asc(userCharacters.name)),
     db
       .selectDistinctOn([characterReports.characterId], {
         characterId: characterReports.characterId,

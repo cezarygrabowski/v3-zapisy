@@ -2,7 +2,7 @@ import test, { describe } from "node:test"
 import assert from "node:assert/strict"
 import { inArray } from "drizzle-orm"
 import { getDb } from "@/lib/db"
-import { guildAdmins, guilds, userCharacters, users, type User } from "@/lib/db/schema"
+import { characterReports, guildAdmins, guilds, userCharacters, users, type User } from "@/lib/db/schema"
 import { listProgressCharacters } from "@/lib/progress"
 
 describe("guild scope on /postep", () => {
@@ -46,5 +46,16 @@ describe("guild scope on /postep", () => {
     assert.deepEqual(await get(ids.player), [`${p}-frosty-char`, `${p}-no-guild`, `${p}-ob-char`])
     assert.deepEqual(await get(ids.admin), [`${p}-admin-own`, `${p}-ob-char`])
     assert.equal((await get(ids.boss)).length, 4)
+  })
+
+  test("characters with the newest report come first, those without one last", async () => {
+    const db = await getDb()
+    await db.insert(characterReports).values([
+      { id: `${p}-r1`, characterId: `${p}-c3`, createdBy: ids.player, createdAt: new Date(Date.now() - 60_000) },
+      { id: `${p}-r2`, characterId: `${p}-c2`, createdBy: ids.player },
+    ])
+    const player = (await db.query.users.findFirst({ where: (u, { eq }) => eq(u.id, ids.player) })) as User
+    const order = (await listProgressCharacters(player)).map((r) => r.name).filter((n) => n.startsWith(p))
+    assert.deepEqual(order, [`${p}-frosty-char`, `${p}-no-guild`, `${p}-ob-char`])
   })
 })
