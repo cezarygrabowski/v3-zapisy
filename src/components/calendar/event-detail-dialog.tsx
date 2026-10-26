@@ -331,6 +331,7 @@ export function EventDetailDialog({
     startTransition(async () => {
       const res = await signUpForGuildEvent({
         eventId: event.id,
+        characterId: activeChar?.id,
         role: partyRole,
         hasHorse: partyHasHorse ?? undefined,
       })
@@ -462,11 +463,28 @@ export function EventDetailDialog({
   const mySignups = event?.signups.filter((s) => s.userId === currentUserId) ?? []
   const mySignup = mySignups[0]
   const userCharacters = event?.currentUserCharacters ?? []
+  const isCharSignedUp = (c: { id: string; name: string }) =>
+    mySignups.some((s) => s.characterId === c.id || s.characterName?.toLowerCase() === c.name.toLowerCase())
+  // After one character is in, the picker moves on to one that is not.
   const activeChar =
     userCharacters.find((c) => c.id === selectedCharacterId) ||
+    userCharacters.find((c) => c.isMain && !isCharSignedUp(c)) ||
+    userCharacters.find((c) => !isCharSignedUp(c)) ||
     userCharacters.find((c) => c.isMain) ||
     userCharacters[0]
   const isEventDay = Boolean(event && event.date === todayInWarsaw(new Date()))
+  // Same rules as V3; the server enforces them, this only explains the disabled button.
+  const partyBlock = !activeChar
+    ? null
+    : isCharSignedUp(activeChar)
+      ? `${activeChar.name} jest już zapisany`
+      : mySignups.length >= 2
+        ? "Maks. 2 postacie"
+        : !activeChar.isMain && !isEventDay
+          ? "Ta postać tylko w dniu wydarzenia"
+          : mySignups.length >= 1 && !isEventDay
+            ? "2. postać tylko w dniu wydarzenia"
+            : null
   const canManage = Boolean(event && (isLeader || event.createdById === currentUserId))
   const isV3 = event?.type === "v3"
   const userPenalty = event?.currentUserPenalty
@@ -486,6 +504,71 @@ export function EventDetailDialog({
       !isLeader &&
       isKonwojSignupClosed(event.type, event.date, event.startTime, event.endTime, event.durationHours)
   )
+
+  // Shared by the V3 spots and the party join box.
+  const characterSwitcher =
+    userCharacters.length > 1 ? (
+    // Container query: a row in the wide V3 section, stacked in the narrow party column.
+    <div className="@container">
+    <div className="flex flex-col @xl:flex-row @xl:items-center justify-between gap-3 p-3 rounded-xl border bg-muted/40 text-xs">
+      <div className="flex flex-col gap-0.5">
+        <span className="font-semibold text-foreground flex flex-wrap items-center gap-1.5">
+          <span>Postać do zapisu:</span>
+          <strong className="text-primary">{activeChar?.name}</strong>
+          {activeChar?.isMain ? (
+            <Badge variant="outline" className="text-[9px] h-4 px-1 border-amber-500/40 text-amber-600 dark:text-amber-400 gap-0.5 font-bold">
+              <Crown className="size-2.5" /> Główna
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[9px] h-4 px-1 text-muted-foreground font-semibold">
+              Dodatkowa
+            </Badge>
+          )}
+        </span>
+        <span className="text-[11px] text-muted-foreground">
+          {!isEventDay
+            ? "Dodatkowe postacie oraz 2. miejsce na ten sam event można zapisać wyłącznie w dniu wydarzenia."
+            : "Dzień wydarzenia: możesz zapisać drugą postać (maksymalnie 2 sloty na gracza)."}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {userCharacters.map((char) => {
+          const isSelected = activeChar?.id === char.id
+          const isSigned = mySignups.some(
+            (s) => s.characterId === char.id || s.characterName?.toLowerCase() === char.name.toLowerCase()
+          )
+          const isLockedChar = !char.isMain && !isEventDay
+
+          return (
+            <Button
+              key={char.id}
+              type="button"
+              size="xs"
+              variant={isSelected ? "default" : "outline"}
+              onClick={() => setSelectedCharacterId(char.id)}
+              disabled={pending}
+              className={`h-7 text-xs gap-1.5 font-medium transition-all ${
+                isSelected ? "shadow-xs ring-1 ring-primary/40 font-bold" : ""
+              }`}
+            >
+              {char.isMain ? <Crown className="size-3 text-amber-400" /> : null}
+              <span>{char.name}</span>
+              <span className="text-[9px] opacity-70">({char.isMain ? "Główna" : "Dodatkowa"})</span>
+              {isSigned ? (
+                <Badge variant="secondary" className="text-[9px] h-3.5 px-1 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold">
+                  Zapisany
+                </Badge>
+              ) : isLockedChar ? (
+                <span className="text-[10px]" title="Dostępny w dniu eventu">🔒</span>
+              ) : null}
+            </Button>
+          )
+        })}
+      </div>
+    </div>
+    </div>
+  ) : null
 
   return (
     <>
@@ -1076,66 +1159,7 @@ export function EventDetailDialog({
                       </div>
                     ) : null}
 
-                    {/* Multi-character switcher if user has multiple characters */}
-                    {userCharacters.length > 1 ? (
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border bg-muted/40 text-xs">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-semibold text-foreground flex items-center gap-1.5">
-                            <span>Postać do zapisu:</span>
-                            <strong className="text-primary">{activeChar?.name}</strong>
-                            {activeChar?.isMain ? (
-                              <Badge variant="outline" className="text-[9px] h-4 px-1 border-amber-500/40 text-amber-600 dark:text-amber-400 gap-0.5 font-bold">
-                                <Crown className="size-2.5" /> Główna
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[9px] h-4 px-1 text-muted-foreground font-semibold">
-                                Dodatkowa
-                              </Badge>
-                            )}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {!isEventDay
-                              ? "Dodatkowe postacie oraz 2. miejsce na ten sam event można zapisać wyłącznie w dniu wydarzenia."
-                              : "Dzień wydarzenia: możesz zapisać drugą postać (maksymalnie 2 sloty na gracza)."}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {userCharacters.map((char) => {
-                            const isSelected = activeChar?.id === char.id
-                            const isSigned = mySignups.some(
-                              (s) => s.characterId === char.id || s.characterName?.toLowerCase() === char.name.toLowerCase()
-                            )
-                            const isLockedChar = !char.isMain && !isEventDay
-
-                            return (
-                              <Button
-                                key={char.id}
-                                type="button"
-                                size="xs"
-                                variant={isSelected ? "default" : "outline"}
-                                onClick={() => setSelectedCharacterId(char.id)}
-                                disabled={pending}
-                                className={`h-7 text-xs gap-1.5 font-medium transition-all ${
-                                  isSelected ? "shadow-xs ring-1 ring-primary/40 font-bold" : ""
-                                }`}
-                              >
-                                {char.isMain ? <Crown className="size-3 text-amber-400" /> : null}
-                                <span>{char.name}</span>
-                                <span className="text-[9px] opacity-70">({char.isMain ? "Główna" : "Dodatkowa"})</span>
-                                {isSigned ? (
-                                  <Badge variant="secondary" className="text-[9px] h-3.5 px-1 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold">
-                                    Zapisany
-                                  </Badge>
-                                ) : isLockedChar ? (
-                                  <span className="text-[10px]" title="Dostępny w dniu eventu">🔒</span>
-                                ) : null}
-                              </Button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
+                    {characterSwitcher}
 
                     {/* Vertical list of spots - one under another */}
                     <div className="flex flex-col gap-2.5">
@@ -1546,24 +1570,32 @@ export function EventDetailDialog({
                     <div className="flex flex-col gap-3">
                       <div className="rounded-xl border p-4 bg-muted/20 flex flex-col gap-3">
                         <span className="font-heading font-semibold text-sm">Dołącz do wyprawy</span>
-                        {mySignup ? (
+                        {mySignups.length ? (
                           <div className="flex flex-col gap-2 text-xs">
-                            <span className="text-emerald-500 font-medium">✓ Jesteś już zapisany!</span>
-                            {isKonwojClosed ? null : (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-xs text-destructive hover:text-destructive"
-                                onClick={() => handleWithdrawClick({ signupId: mySignup.signupId, userId: currentUserId, spot: mySignup.spot })}
-                              >
-                                Wypisz się
-                              </Button>
-                            )}
+                            {mySignups.map((s) => (
+                              <div key={s.signupId} className="flex items-center justify-between gap-2">
+                                <span className="text-emerald-500 font-medium truncate">✓ Zapisany: {s.gameNick}</span>
+                                {isKonwojClosed ? null : (
+                                  <Button
+                                    variant="outline"
+                                    size="xs"
+                                    className="text-xs text-destructive hover:text-destructive shrink-0"
+                                    onClick={() => handleWithdrawClick({ signupId: s.signupId, userId: currentUserId, spot: s.spot })}
+                                  >
+                                    Wypisz
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        ) : isKonwojClosed ? (
-                          <p className="text-xs text-muted-foreground">Konwój już się zakończył — zapisy są zamknięte.</p>
-                        ) : (
+                        ) : null}
+                        {isKonwojClosed ? (
+                          mySignups.length ? null : (
+                            <p className="text-xs text-muted-foreground">Konwój już się zakończył — zapisy są zamknięte.</p>
+                          )
+                        ) : mySignups.length === 0 || (mySignups.length < 2 && userCharacters.length > 1) ? (
                           <form onSubmit={handlePartySignUp} className="flex flex-col gap-3">
+                            {characterSwitcher}
                             <Field>
                               <FieldLabel htmlFor="modal-party-role">Klasa / Rola (opcjonalnie)</FieldLabel>
                               <Input
@@ -1602,13 +1634,16 @@ export function EventDetailDialog({
                               type="submit"
                               size="sm"
                               className="w-full text-xs font-semibold"
-                              disabled={pending || (event.type === "konwoj" && partyHasHorse === null)}
+                              disabled={pending || Boolean(partyBlock) || (event.type === "konwoj" && partyHasHorse === null)}
                             >
                               {pending ? <Spinner data-icon="inline-start" /> : null}
-                              Zapisz się do składu
+                              {partyBlock ??
+                                (userCharacters.length > 1 && activeChar
+                                  ? `Zapisz ${activeChar.name}`
+                                  : "Zapisz się do składu")}
                             </Button>
                           </form>
-                        )}
+                        ) : null}
                       </div>
 
                       {isLeader ? (
