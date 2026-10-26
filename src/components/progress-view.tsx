@@ -239,6 +239,8 @@ export function NewReportDialog({
   return (
     <Dialog
       open={open}
+      // A stray click next to the long form would throw away everything typed so far.
+      disablePointerDismissal
       onOpenChange={(next) => {
         if (next) pickCharacter(defaultCharacterId)
         else clearShots()
