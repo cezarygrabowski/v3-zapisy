@@ -472,8 +472,8 @@ export function EventDetailDialog({
     userCharacters.find((c) => !isCharSignedUp(c)) ||
     userCharacters.find((c) => c.isMain) ||
     userCharacters[0]
-  const isEventDay = Boolean(event && event.date === todayInWarsaw(new Date()))
-  // Same rules as V3; the server enforces them, this only explains the disabled button.
+  // Only V3 keeps extra characters for the event day; the server enforces it, this explains the button.
+  const isEventDay = Boolean(event && (event.type !== "v3" || event.date === todayInWarsaw(new Date())))
   const partyBlock = !activeChar
     ? null
     : isCharSignedUp(activeChar)
@@ -528,7 +528,9 @@ export function EventDetailDialog({
         <span className="text-[11px] text-muted-foreground">
           {!isEventDay
             ? "Dodatkowe postacie oraz 2. miejsce na ten sam event można zapisać wyłącznie w dniu wydarzenia."
-            : "Dzień wydarzenia: możesz zapisać drugą postać (maksymalnie 2 sloty na gracza)."}
+            : event?.type === "v3"
+              ? "Dzień wydarzenia: możesz zapisać drugą postać (maksymalnie 2 sloty na gracza)."
+              : "Możesz zapisać maksymalnie 2 postacie."}
         </span>
       </div>
 
@@ -1496,7 +1498,7 @@ export function EventDetailDialog({
                           Brak zapisanych postaci. Bądź pierwszy!
                         </div>
                       ) : (
-                        <div className="flex flex-col gap-1.5 max-h-[360px] overflow-y-auto pr-1">
+                        <div className="flex flex-col gap-1.5">
                           {event.signups.map((p, idx) => {
                             return (
                               <div
